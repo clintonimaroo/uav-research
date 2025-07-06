@@ -1,0 +1,30 @@
+augment: true
+batch_size: 16
+classes:
+- fire
+- collapsed_building
+- flooded_areas
+- traffic_incident
+- normal
+dataset_path: dataset/aider_ dataset/
+early_stopping_patience: 15
+export_onnx: true
+export_torchscript: true
+freeze_backbone: false
+gamma: 0.1
+input_size: 224
+learning_rate: 0.0003
+log_interval: 10
+model_name: efficientnet_b0
+num_classes: 5
+num_epochs: 75
+num_workers: 4
+pin_memory: true
+pretrained: true
+save_best_only: true
+save_dir: checkpoints
+step_size: 25
+train_ratio: 0.8
+use_class_weights: true
+val_interval: 1
+weight_decay: 0.0001
