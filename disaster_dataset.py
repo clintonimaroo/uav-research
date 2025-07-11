@@ -29,17 +29,14 @@ class AIDERDataset(Dataset):
         self.transform = transform
         self.split = split
         
-        # Create class to index mapping
         self.class_to_idx = {cls: idx for idx, cls in enumerate(sorted(self.classes))}
         self.idx_to_class = {idx: cls for cls, idx in self.class_to_idx.items()}
         
-        # Load image paths and labels
         self.image_paths = []
         self.labels = []
         
         self._load_data()
         
-        # Split data if needed
         if split != 'all':
             self._split_data(train_ratio)
     
@@ -66,7 +63,6 @@ class AIDERDataset(Dataset):
     
     def _split_data(self, train_ratio: float):
         """Split data into train/validation sets"""
-        # Group indices by class for stratified split
         class_indices = {}
         for idx, label in enumerate(self.labels):
             class_name = self.idx_to_class[label]
@@ -77,20 +73,17 @@ class AIDERDataset(Dataset):
         train_indices = []
         val_indices = []
         
-        # Stratified split
         for class_name, indices in class_indices.items():
             np.random.shuffle(indices)
             n_train = int(len(indices) * train_ratio)
             train_indices.extend(indices[:n_train])
             val_indices.extend(indices[n_train:])
         
-        # Select appropriate split
         if self.split == 'train':
             selected_indices = train_indices
         else:  # 'val'
             selected_indices = val_indices
         
-        # Filter data
         self.image_paths = [self.image_paths[i] for i in selected_indices]
         self.labels = [self.labels[i] for i in selected_indices]
         
@@ -103,7 +96,6 @@ class AIDERDataset(Dataset):
         img_path = self.image_paths[idx]
         label = self.labels[idx]
         
-        # Load image
         try:
             image = Image.open(img_path).convert('RGB')
         except Exception as e:
@@ -111,7 +103,6 @@ class AIDERDataset(Dataset):
             # Return a black image as fallback
             image = Image.new('RGB', (224, 224), color='black')
         
-        # Apply transforms
         if self.transform:
             image = self.transform(image)
         
@@ -123,7 +114,6 @@ class AIDERDataset(Dataset):
         for label in self.labels:
             class_counts[label] += 1
         
-        # Inverse frequency weighting
         total_samples = len(self.labels)
         weights = total_samples / (len(self.classes) * class_counts)
         
@@ -133,7 +123,6 @@ def get_transforms(input_size: int = 224, augment: bool = True):
     """Get image transforms for training and validation"""
     
     if augment:
-        # Training transforms with augmentation
         train_transform = transforms.Compose([
             transforms.Resize((input_size + 32, input_size + 32)),
             transforms.RandomCrop(input_size),
@@ -145,7 +134,6 @@ def get_transforms(input_size: int = 224, augment: bool = True):
                                std=[0.229, 0.224, 0.225])
         ])
     else:
-        # Simple training transform without augmentation
         train_transform = transforms.Compose([
             transforms.Resize((input_size, input_size)),
             transforms.ToTensor(),
@@ -153,7 +141,6 @@ def get_transforms(input_size: int = 224, augment: bool = True):
                                std=[0.229, 0.224, 0.225])
         ])
     
-    # Validation transforms (no augmentation)
     val_transform = transforms.Compose([
         transforms.Resize((input_size, input_size)),
         transforms.ToTensor(),
@@ -174,10 +161,8 @@ def create_data_loaders(dataset_path: str = "dataset/aider_ dataset/",
     
     classes = classes or ['fire', 'normal']
     
-    # Get transforms
     train_transform, val_transform = get_transforms(input_size, augment)
     
-    # Create datasets
     train_dataset = AIDERDataset(
         dataset_path=dataset_path,
         classes=classes,
@@ -194,7 +179,6 @@ def create_data_loaders(dataset_path: str = "dataset/aider_ dataset/",
         train_ratio=train_ratio
     )
     
-    # Create data loaders
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
@@ -218,18 +202,16 @@ def test_dataset():
     """Test the dataset implementation"""
     print("Testing AIDER Dataset...")
     
-    # Test with fire detection
     train_loader, val_loader, class_to_idx = create_data_loaders(
         classes=['fire', 'normal'],
         batch_size=4,
-        num_workers=0  # For testing
+        num_workers=0  
     )
     
     print(f"Class mapping: {class_to_idx}")
     print(f"Train batches: {len(train_loader)}")
     print(f"Val batches: {len(val_loader)}")
     
-    # Test a batch
     for images, labels in train_loader:
         print(f"Batch shape: {images.shape}")
         print(f"Labels: {labels}")

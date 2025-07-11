@@ -23,7 +23,6 @@ class ModelEvaluator:
         # Load checkpoint
         self.checkpoint = torch.load(model_path, map_location=self.device)
         
-        # Load configuration
         if config_path:
             self.config = TrainingConfig.load_config(config_path)
         else:
@@ -34,7 +33,6 @@ class ModelEvaluator:
         self.class_to_idx = self.checkpoint.get('class_to_idx', {})
         self.idx_to_class = {v: k for k, v in self.class_to_idx.items()}
         
-        # Initialize model
         self.model = create_model(
             model_name=self.config.model_name,
             num_classes=self.config.num_classes
@@ -90,11 +88,9 @@ class ModelEvaluator:
             roc_auc_score, average_precision_score
         )
         
-        # Basic metrics
         accuracy = accuracy_score(y_true, y_pred)
         precision, recall, f1, support = precision_recall_fscore_support(y_true, y_pred, average=None)
         
-        # Per-class metrics
         class_names = [self.idx_to_class[i] for i in range(len(self.idx_to_class))]
         metrics = {}
         
@@ -106,7 +102,6 @@ class ModelEvaluator:
                 'support': support[i]
             }
             
-            # ROC AUC for binary classification or multiclass
             if len(class_names) == 2:
                 if i == 1:  # Positive class
                     try:
@@ -116,7 +111,6 @@ class ModelEvaluator:
                         metrics[class_name]['roc_auc'] = 0.0
                         metrics[class_name]['avg_precision'] = 0.0
             else:
-                # Multiclass - one-vs-rest AUC
                 try:
                     y_true_binary = (y_true == i).astype(int)
                     metrics[class_name]['roc_auc'] = roc_auc_score(y_true_binary, y_probs[:, i])
@@ -125,7 +119,6 @@ class ModelEvaluator:
                     metrics[class_name]['roc_auc'] = 0.0
                     metrics[class_name]['avg_precision'] = 0.0
         
-        # Overall metrics
         precision_avg, recall_avg, f1_avg, _ = precision_recall_fscore_support(y_true, y_pred, average='weighted')
         
         metrics['overall'] = {
@@ -185,10 +178,8 @@ class ModelEvaluator:
             print("No misclassifications found!")
             return
         
-        # Calculate confidence for each prediction
         confidences = np.max(y_probs, axis=1)
         
-        # Get most confident misclassifications
         misclassified_confidences = confidences[misclassified_indices]
         most_confident_errors = misclassified_indices[np.argsort(misclassified_confidences)[::-1]]
         
@@ -207,7 +198,6 @@ class ModelEvaluator:
         if save_dir:
             os.makedirs(save_dir, exist_ok=True)
         
-        # Create test dataset
         _, val_transform = get_transforms(self.config.input_size, augment=False)
         test_dataset = AIDERDataset(
             dataset_path=self.config.dataset_path,
@@ -221,13 +211,10 @@ class ModelEvaluator:
             test_dataset, batch_size=32, shuffle=False, num_workers=4
         )
         
-        # Evaluate
         y_pred, y_true, y_probs, avg_loss = self.evaluate_dataset(test_loader, "Test")
         
-        # Calculate metrics
         metrics, class_names = self.calculate_detailed_metrics(y_true, y_pred, y_probs)
         
-        # Print results
         print(f"\n{'='*60}")
         print("EVALUATION RESULTS")
         print(f"{'='*60}")
@@ -252,23 +239,19 @@ class ModelEvaluator:
                 print(f"{class_name:<15} {m['precision']:<10.3f} {m['recall']:<10.3f} "
                       f"{m['f1']:<10.3f} {m['support']:<10}")
         
-        # Generate plots
         if save_dir:
             # Confusion matrix
             fig_cm, cm = self.plot_confusion_matrix(y_true, y_pred, class_names, 
                                                    os.path.join(save_dir, 'confusion_matrix.png'))
             plt.close(fig_cm)
             
-            # Class distribution
             fig_dist = self.plot_class_distribution(y_true, class_names,
                                                    os.path.join(save_dir, 'class_distribution.png'))
             plt.close(fig_dist)
             
-            # Save metrics to file
             import json
             metrics_file = os.path.join(save_dir, 'metrics.json')
             with open(metrics_file, 'w') as f:
-                # Convert numpy types to Python types for JSON serialization
                 json_metrics = {}
                 for k, v in metrics.items():
                     if isinstance(v, dict):
@@ -280,7 +263,6 @@ class ModelEvaluator:
             
             print(f"\nResults saved to: {save_dir}")
         
-        # Analyze misclassifications
         self.analyze_misclassifications(y_true, y_pred, y_probs, class_names)
         
         return metrics
@@ -297,10 +279,8 @@ def main():
     
     args = parser.parse_args()
     
-    # Create evaluator
     evaluator = ModelEvaluator(args.model_path, args.config_path)
     
-    # Generate report
     metrics = evaluator.generate_report(args.save_dir)
     
     print(f"\nEvaluation completed!")

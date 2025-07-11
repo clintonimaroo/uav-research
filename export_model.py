@@ -18,10 +18,8 @@ class ModelExporter:
         self.model_path = model_path
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
-        # Load checkpoint
         self.checkpoint = torch.load(model_path, map_location=self.device)
         
-        # Load configuration
         if config_path:
             self.config = TrainingConfig.load_config(config_path)
         else:
@@ -31,7 +29,6 @@ class ModelExporter:
         
         self.class_to_idx = self.checkpoint.get('class_to_idx', {})
         
-        # Initialize model
         self.model = create_model(
             model_name=self.config.model_name,
             num_classes=self.config.num_classes
@@ -50,17 +47,13 @@ class ModelExporter:
         
         print(f"Exporting to TorchScript: {save_path}")
         
-        # Create dummy input
         dummy_input = torch.randn(1, *input_size)
         
-        # Trace the model
         try:
             traced_model = torch.jit.trace(self.model, dummy_input)
             
-            # Save the traced model
             traced_model.save(save_path)
             
-            # Verify the export
             self._verify_torchscript_export(save_path, dummy_input)
             
             print(f"✓ TorchScript export successful: {save_path}")
@@ -78,14 +71,11 @@ class ModelExporter:
         
         print(f"Exporting to ONNX: {save_path}")
         
-        # Create dummy input
         dummy_input = torch.randn(1, *input_size)
         
-        # Define input and output names
         input_names = ['input']
         output_names = ['output']
         
-        # Define dynamic axes for variable batch size
         dynamic_axes = {
             'input': {0: 'batch_size'},
             'output': {0: 'batch_size'}
@@ -105,7 +95,6 @@ class ModelExporter:
                 dynamic_axes=dynamic_axes
             )
             
-            # Verify the export
             self._verify_onnx_export(save_path, dummy_input)
             
             print(f"✓ ONNX export successful: {save_path}")
@@ -117,16 +106,13 @@ class ModelExporter:
     
     def _verify_torchscript_export(self, model_path: str, dummy_input: torch.Tensor):
         """Verify TorchScript export by comparing outputs"""
-        # Load the exported model
         loaded_model = torch.jit.load(model_path)
         loaded_model.eval()
         
-        # Compare outputs
         with torch.no_grad():
             original_output = self.model(dummy_input)
             exported_output = loaded_model(dummy_input)
             
-            # Check if outputs are close
             if torch.allclose(original_output, exported_output, atol=1e-5):
                 print("  ✓ TorchScript verification passed")
             else:
@@ -136,22 +122,17 @@ class ModelExporter:
     def _verify_onnx_export(self, model_path: str, dummy_input: torch.Tensor):
         """Verify ONNX export by comparing outputs"""
         try:
-            # Load ONNX model
             onnx_model = onnx.load(model_path)
             onnx.checker.check_model(onnx_model)
             
-            # Create ONNX Runtime session
             ort_session = ort.InferenceSession(model_path)
             
-            # Get input name
             input_name = ort_session.get_inputs()[0].name
             
-            # Run inference
             with torch.no_grad():
                 original_output = self.model(dummy_input).numpy()
                 onnx_output = ort_session.run(None, {input_name: dummy_input.numpy()})[0]
                 
-                # Check if outputs are close
                 if np.allclose(original_output, onnx_output, atol=1e-5):
                     print("  ✓ ONNX verification passed")
                 else:
@@ -176,12 +157,10 @@ class ModelExporter:
             }
         }
         
-        # Add model-specific info
         if hasattr(self.model, 'get_model_info'):
             model_stats = self.model.get_model_info()
             model_info.update(model_stats)
         
-        # Save to JSON
         import json
         with open(save_path, 'w') as f:
             json.dump(model_info, f, indent=2)
@@ -193,12 +172,10 @@ class ModelExporter:
         input_size = (3, self.config.input_size, self.config.input_size)
         dummy_input = torch.randn(batch_size, *input_size)
         
-        # Warm up
         with torch.no_grad():
             for _ in range(10):
                 _ = self.model(dummy_input)
         
-        # Benchmark
         import time
         times = []
         
@@ -226,24 +203,19 @@ class ModelExporter:
         
         model_name = f"{self.config.model_name}_{self.config.num_classes}classes"
         
-        # Export TorchScript
         torchscript_path = os.path.join(export_dir, f"{model_name}.pt")
         self.export_torchscript(torchscript_path)
         
-        # Export ONNX
         onnx_path = os.path.join(export_dir, f"{model_name}.onnx")
         self.export_onnx(onnx_path)
         
-        # Export model info
         info_path = os.path.join(export_dir, f"{model_name}_info.json")
         self.export_model_info(info_path)
         
-        # Benchmark
         self.benchmark_inference()
         
         print(f"\n✓ All exports completed in: {export_dir}")
         
-        # Create deployment README
         self._create_deployment_readme(export_dir, model_name)
     
     def _create_deployment_readme(self, export_dir: str, model_name: str):
@@ -339,10 +311,8 @@ def main():
     
     args = parser.parse_args()
     
-    # Create exporter
     exporter = ModelExporter(args.model_path, args.config_path)
     
-    # Export based on format
     if args.format == 'all':
         exporter.export_all(args.export_dir)
     elif args.format == 'torchscript':
@@ -356,7 +326,6 @@ def main():
         onnx_path = os.path.join(args.export_dir, f"{model_name}.onnx")
         exporter.export_onnx(onnx_path)
     
-    # Run benchmark if requested
     if args.benchmark:
         exporter.benchmark_inference()
     

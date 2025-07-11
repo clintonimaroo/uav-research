@@ -21,7 +21,6 @@ class DisasterTrainer:
         self.config = config
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
-        # Initialize components
         self.model = None
         self.optimizer = None
         self.scheduler = None
@@ -30,12 +29,10 @@ class DisasterTrainer:
         self.val_loader = None
         self.class_to_idx = None
         
-        # Training state
         self.current_epoch = 0
         self.best_val_acc = 0.0
         self.epochs_without_improvement = 0
         
-        # Logging
         self.writer = None
         self.setup_logging()
         
@@ -69,34 +66,29 @@ class DisasterTrainer:
         """Setup model, optimizer, and scheduler"""
         print("Setting up model...")
         
-        # Create model
         self.model = create_model(
             model_name=self.config.model_name,
             num_classes=self.config.num_classes,
             pretrained=self.config.pretrained
         )
         
-        # Freeze backbone if specified
         if self.config.freeze_backbone:
             freeze_backbone(self.model, self.config.model_name)
         
         self.model = self.model.to(self.device)
         
-        # Setup optimizer
         self.optimizer = optim.Adam(
             self.model.parameters(),
             lr=self.config.learning_rate,
             weight_decay=self.config.weight_decay
         )
         
-        # Setup scheduler
         self.scheduler = StepLR(
             self.optimizer,
             step_size=self.config.step_size,
             gamma=self.config.gamma
         )
         
-        # Setup loss function
         if self.config.use_class_weights:
             # Calculate class weights from training data
             train_dataset = self.train_loader.dataset
@@ -107,7 +99,6 @@ class DisasterTrainer:
         else:
             self.criterion = nn.CrossEntropyLoss()
         
-        # Print model info
         if hasattr(self.model, 'get_model_info'):
             model_info = self.model.get_model_info()
             print(f"Model: {model_info['model_name']}")
@@ -127,28 +118,23 @@ class DisasterTrainer:
             images = images.to(self.device)
             targets = targets.to(self.device)
             
-            # Forward pass
             outputs = self.model(images)
             loss = self.criterion(outputs, targets)
             
-            # Backward pass
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
             
-            # Measure accuracy and record loss
             acc1 = accuracy(outputs, targets, topk=(1,))[0]
             losses.update(loss.item(), images.size(0))
             top1.update(acc1.item(), images.size(0))
             
-            # Update progress bar
             pbar.set_postfix({
                 'Loss': f'{losses.avg:.4f}',
                 'Acc': f'{top1.avg:.2f}%',
                 'LR': f'{self.optimizer.param_groups[0]["lr"]:.6f}'
             })
             
-            # Log to tensorboard
             if batch_idx % self.config.log_interval == 0:
                 step = self.current_epoch * len(self.train_loader) + batch_idx
                 self.writer.add_scalar('Train/Loss', loss.item(), step)
@@ -192,11 +178,9 @@ class DisasterTrainer:
             'class_to_idx': self.class_to_idx
         }
         
-        # Save regular checkpoint
         checkpoint_path = os.path.join(self.config.save_dir, 'checkpoint.pth')
         torch.save(checkpoint, checkpoint_path)
         
-        # Save best model
         if is_best:
             best_path = os.path.join(self.config.save_dir, 'best_model.pth')
             torch.save(checkpoint, best_path)
@@ -206,33 +190,26 @@ class DisasterTrainer:
         """Main training loop"""
         print("Starting training...")
         
-        # Setup everything
         self.setup_data()
         self.setup_model()
         
-        # Training loop
         for epoch in range(self.config.num_epochs):
             self.current_epoch = epoch
             
-            # Train
             train_loss, train_acc = self.train_epoch()
             
-            # Validate
             if epoch % self.config.val_interval == 0:
                 val_loss, val_acc = self.validate()
                 
-                # Log to tensorboard
                 self.writer.add_scalar('Epoch/Train_Loss', train_loss, epoch)
                 self.writer.add_scalar('Epoch/Train_Acc', train_acc, epoch)
                 self.writer.add_scalar('Epoch/Val_Loss', val_loss, epoch)
                 self.writer.add_scalar('Epoch/Val_Acc', val_acc, epoch)
                 
-                # Print results
                 print(f'Epoch {epoch+1}/{self.config.num_epochs}:')
                 print(f'  Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}%')
                 print(f'  Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%')
                 
-                # Check if this is the best model
                 is_best = val_acc > self.best_val_acc
                 if is_best:
                     self.best_val_acc = val_acc
@@ -240,16 +217,13 @@ class DisasterTrainer:
                 else:
                     self.epochs_without_improvement += 1
                 
-                # Save checkpoint
                 if not self.config.save_best_only or is_best:
                     self.save_model(is_best)
                 
-                # Early stopping
                 if self.epochs_without_improvement >= self.config.early_stopping_patience:
                     print(f"Early stopping after {epoch+1} epochs")
                     break
             
-            # Update learning rate
             self.scheduler.step()
         
         print(f"Training completed. Best validation accuracy: {self.best_val_acc:.2f}%")
@@ -273,13 +247,11 @@ def main():
     
     args = parser.parse_args()
     
-    # Load or create configuration
     if args.config:
         config = TrainingConfig.load_config(args.config)
     else:
         config = get_fire_detection_config()
         
-        # Override with command line arguments
         config.model_name = args.model
         config.classes = args.classes
         config.num_classes = len(args.classes)
@@ -288,10 +260,8 @@ def main():
         config.learning_rate = args.lr
         config.save_dir = args.save_dir
     
-    # Save configuration
     config.save_config(os.path.join(config.save_dir, 'config.yaml'))
     
-    # Create trainer and train
     trainer = DisasterTrainer(config)
     best_acc = trainer.train()
     

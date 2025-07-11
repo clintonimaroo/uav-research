@@ -58,14 +58,11 @@ def load_checkpoint(checkpoint_path, model, optimizer=None, scheduler=None):
     
     checkpoint = torch.load(checkpoint_path, map_location='cpu')
     
-    # Load model state
     model.load_state_dict(checkpoint['model_state_dict'])
     
-    # Load optimizer state if provided
     if optimizer is not None and 'optimizer_state_dict' in checkpoint:
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     
-    # Load scheduler state if provided
     if scheduler is not None and 'scheduler_state_dict' in checkpoint:
         scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
     
@@ -131,23 +128,18 @@ def print_model_summary(model, input_size=(3, 224, 224)):
         if not isinstance(module, nn.Sequential) and not isinstance(module, nn.ModuleList):
             hooks.append(module.register_forward_hook(hook))
     
-    # Create summary dict
     summary = {}
     hooks = []
     
-    # Register hooks
     model.apply(register_hook)
     
-    # Make a forward pass
     device = next(model.parameters()).device
     x = torch.randn(1, *input_size).to(device)
     model(x)
     
-    # Remove hooks
     for h in hooks:
         h.remove()
     
-    # Print summary
     print("Model Summary:")
     print("-" * 70)
     print(f"{'Layer (type)':<25} {'Output Shape':<25} {'Param #':<15}")
@@ -195,7 +187,6 @@ def calculate_metrics(y_true, y_pred, class_names):
     accuracy = accuracy_score(y_true, y_pred)
     precision, recall, f1, support = precision_recall_fscore_support(y_true, y_pred, average=None)
     
-    # Per-class metrics
     metrics = {}
     for i, class_name in enumerate(class_names):
         metrics[class_name] = {
@@ -205,7 +196,6 @@ def calculate_metrics(y_true, y_pred, class_names):
             'support': support[i]
         }
     
-    # Overall metrics
     precision_avg, recall_avg, f1_avg, _ = precision_recall_fscore_support(y_true, y_pred, average='weighted')
     
     metrics['overall'] = {
@@ -215,7 +205,6 @@ def calculate_metrics(y_true, y_pred, class_names):
         'f1': f1_avg
     }
     
-    # Classification report
     report = classification_report(y_true, y_pred, target_names=class_names)
     
     return metrics, report 

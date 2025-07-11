@@ -21,10 +21,8 @@ class DisasterClassifier(nn.Module):
     
     def _create_mobilenet_v2(self):
         """Create MobileNetV2 model for disaster detection"""
-        # Load pretrained model
         model = models.mobilenet_v2(weights=MobileNet_V2_Weights.IMAGENET1K_V1)
         
-        # Modify classifier for our number of classes
         model.classifier = nn.Sequential(
             nn.Dropout(0.2),
             nn.Linear(model.last_channel, self.num_classes)
@@ -34,10 +32,8 @@ class DisasterClassifier(nn.Module):
     
     def _create_efficientnet_b0(self):
         """Create EfficientNet-B0 model for disaster detection"""
-        # Load pretrained model
         model = models.efficientnet_b0(weights=EfficientNet_B0_Weights.IMAGENET1K_V1)
         
-        # Modify classifier for our number of classes
         model.classifier = nn.Sequential(
             nn.Dropout(0.2, inplace=True),
             nn.Linear(model.classifier[1].in_features, self.num_classes)
@@ -68,33 +64,26 @@ class LightweightCNN(nn.Module):
         super(LightweightCNN, self).__init__()
         self.num_classes = num_classes
         
-        # Feature extractor
         self.features = nn.Sequential(
-            # Block 1
             nn.Conv2d(input_channels, 32, kernel_size=3, stride=2, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU(inplace=True),
             
-            # Block 2
             nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
             
-            # Block 3
             nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),
             nn.BatchNorm2d(128),
             nn.ReLU(inplace=True),
             
-            # Block 4
             nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1),
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
             
-            # Global average pooling
             nn.AdaptiveAvgPool2d((1, 1))
         )
         
-        # Classifier
         self.classifier = nn.Sequential(
             nn.Dropout(0.3),
             nn.Linear(256, 128),
@@ -186,18 +175,15 @@ def test_models():
     """Test model creation and forward pass"""
     print("Testing model architectures...")
     
-    # Test input
     batch_size = 4
     input_tensor = torch.randn(batch_size, 3, 224, 224)
     
     for model_name in ['mobilenet_v2', 'efficientnet_b0', 'lightweight_cnn']:
         print(f"\nTesting {model_name}...")
         
-        # Create model
         model = create_model(model_name, num_classes=2)
         model.eval()
         
-        # Forward pass
         with torch.no_grad():
             output = model(input_tensor)
         
@@ -205,7 +191,6 @@ def test_models():
         print(f"Output shape: {output.shape}")
         print(f"Model info: {model.get_model_info()}")
         
-        # Test freezing
         freeze_backbone(model, model_name)
         trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         print(f"Trainable params after freezing: {trainable_params:,}")
