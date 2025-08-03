@@ -25,7 +25,7 @@ class BatchVideoProcessor:
                       if f.lower().endswith(video_extensions)]
         
         if not video_files:
-            print(f"No video files found in {videos_dir}")
+            print(f"❌ No video files found in {videos_dir}")
             return {}
         
         print(f"📹 Found {len(video_files)} videos to process")
