@@ -20,7 +20,7 @@ class DisasterDetectionDemo:
     def __init__(self, model_path: str, config_path: str = None):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
-        self.checkpoint = torch.load(model_path, map_location=self.device)
+        self.checkpoint = torch.load(model_path, map_location=self.device, weights_only=False)
         
         if config_path:
             self.config = TrainingConfig.load_config(config_path)

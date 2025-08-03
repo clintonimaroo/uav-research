@@ -10,7 +10,7 @@ class AIDERDataset(Dataset):
     """PyTorch dataset for AIDER disaster detection dataset"""
     
     def __init__(self, 
-                 dataset_path: str = "dataset/aider_ dataset/",
+                 dataset_path: str = "data/aider_ dataset/",
                  classes: List[str] = None,
                  transform: Optional[transforms.Compose] = None,
                  split: str = 'train',
@@ -150,7 +150,7 @@ def get_transforms(input_size: int = 224, augment: bool = True):
     
     return train_transform, val_transform
 
-def create_data_loaders(dataset_path: str = "dataset/aider_ dataset/",
+def create_data_loaders(dataset_path: str = "data/aider_ dataset/",
                        classes: List[str] = None,
                        batch_size: int = 32,
                        input_size: int = 224,

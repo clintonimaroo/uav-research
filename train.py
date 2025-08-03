@@ -186,14 +186,26 @@ class DisasterTrainer:
             torch.save(checkpoint, best_path)
             print(f"New best model saved with accuracy: {self.best_val_acc:.2f}%")
     
-    def train(self):
+    def train(self, resume_from_checkpoint=None):
         """Main training loop"""
         print("Starting training...")
         
         self.setup_data()
         self.setup_model()
         
-        for epoch in range(self.config.num_epochs):
+        start_epoch = 0
+        if resume_from_checkpoint:
+            print(f"Resuming from checkpoint: {resume_from_checkpoint}")
+            checkpoint = torch.load(resume_from_checkpoint, map_location=self.device, weights_only=False)
+            self.model.load_state_dict(checkpoint['model_state_dict'])
+            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+            self.best_val_acc = checkpoint['best_val_acc']
+            start_epoch = checkpoint['epoch'] + 1
+            self.current_epoch = start_epoch
+            print(f"Resuming from epoch {start_epoch}, best val acc: {self.best_val_acc:.2f}%")
+        
+        for epoch in range(start_epoch, self.config.num_epochs):
             self.current_epoch = epoch
             
             train_loss, train_acc = self.train_epoch()
@@ -244,6 +256,7 @@ def main():
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size')
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
     parser.add_argument('--save_dir', type=str, default='checkpoints', help='Save directory')
+    parser.add_argument('--resume', type=str, default=None, help='Path to checkpoint to resume from')
     
     args = parser.parse_args()
     
@@ -263,7 +276,7 @@ def main():
     config.save_config(os.path.join(config.save_dir, 'config.yaml'))
     
     trainer = DisasterTrainer(config)
-    best_acc = trainer.train()
+    best_acc = trainer.train(resume_from_checkpoint=args.resume)
     
     print(f"\nTraining Summary:")
     print(f"Model: {config.model_name}")

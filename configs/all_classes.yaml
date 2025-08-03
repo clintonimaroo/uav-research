@@ -6,7 +6,7 @@ classes:
 - flooded_areas
 - traffic_incident
 - normal
-dataset_path: dataset/aider_ dataset/
+dataset_path: data/aider_ dataset/
 early_stopping_patience: 15
 export_onnx: true
 export_torchscript: true

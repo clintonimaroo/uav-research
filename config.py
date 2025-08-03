@@ -8,7 +8,7 @@ import json
 class TrainingConfig:
     """Configuration for training disaster detection models"""
     
-    dataset_path: str = "dataset/aider_ dataset/"
+    dataset_path: str = "data/aider_ dataset/"
     classes: List[str] = None
     train_ratio: float = 0.8
     input_size: int = 224
