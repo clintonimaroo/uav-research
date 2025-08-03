@@ -14,6 +14,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import TrainingConfig
 from models import create_model
 from disaster_dataset import get_transforms
+from aerial_image_processor import AerialImageProcessor
 
 class UAVNavigationEnv(gym.Env):
     def __init__(self, grid_size: int = 50, max_steps: int = 200, 
@@ -32,6 +33,7 @@ class UAVNavigationEnv(gym.Env):
         )
         
         self._load_disaster_classifier(classifier_path)
+        self.aerial_processor = AerialImageProcessor(classifier_path)
         self._initialize_environment()
         
     def _load_disaster_classifier(self, model_path: str):
@@ -62,30 +64,16 @@ class UAVNavigationEnv(gym.Env):
         self.path_history = [self.uav_position.copy()]
         
     def _generate_disaster_zones(self):
-        disaster_types = ['fire', 'collapsed_building', 'flooded_areas', 'traffic_incident']
-        num_zones = np.random.randint(8, 15)
+        print("Generating aerial imagery and processing through disaster classifier...")
         
-        for _ in range(num_zones):
-            center = np.random.randint(10, self.grid_size-10, 2)
-            
-            if np.linalg.norm(center - self.goal_position) < 8:
-                continue
-            if np.linalg.norm(center - self.uav_position) < 8:
-                continue
-                
-            zone_size = np.random.randint(3, 8)
-            disaster_type = np.random.choice(disaster_types)
-            intensity = np.random.uniform(0.6, 1.0)
-            
-            for dx in range(-zone_size, zone_size+1):
-                for dy in range(-zone_size, zone_size+1):
-                    x, y = center[0] + dx, center[1] + dy
-                    if 0 <= x < self.grid_size and 0 <= y < self.grid_size:
-                        distance = np.sqrt(dx**2 + dy**2)
-                        if distance <= zone_size:
-                            fade_factor = max(0, 1 - distance / zone_size)
-                            self.hazard_map[x, y] = min(1.0, intensity * fade_factor)
-                            self.confidence_map[x, y] = np.random.uniform(0.7, 0.95)
+        self.aerial_image, self.disaster_locations = self.aerial_processor.generate_aerial_scene(self.grid_size)
+        
+        self.hazard_map, self.confidence_map = self.aerial_processor.process_aerial_image_grid(
+            self.aerial_image, self.grid_size
+        )
+        
+        print(f"Processed aerial imagery: {len(self.disaster_locations)} disaster zones detected")
+        print(f"Classifier identified {np.sum(self.hazard_map > 0.3)} high-risk grid cells")
     
     def _get_observation(self):
         obs = np.zeros((self.grid_size, self.grid_size, 4))
@@ -100,12 +88,18 @@ class UAVNavigationEnv(gym.Env):
     
     def _classify_current_area(self):
         x, y = self.uav_position
+        
+        current_hazard = self.hazard_map[x, y]
+        current_confidence = self.confidence_map[x, y]
+        
         local_area = self.hazard_map[max(0, x-2):min(self.grid_size, x+3),
                                     max(0, y-2):min(self.grid_size, y+3)]
         
-        if np.any(local_area > 0.5):
-            return np.max(local_area), True
-        return 0.0, False
+        max_local_hazard = np.max(local_area) if local_area.size > 0 else 0.0
+        
+        in_danger = current_hazard > 0.5 or max_local_hazard > 0.7
+        
+        return max(current_hazard, max_local_hazard), in_danger
     
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, Dict]:
         self.current_step += 1
