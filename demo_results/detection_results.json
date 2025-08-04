@@ -1,0 +1,44 @@
+[
+  {
+    "predicted_class": "normal",
+    "confidence": 1.0,
+    "probabilities": {
+      "collapsed_building": 1.745246791529098e-08,
+      "fire": 2.7538518340697316e-11,
+      "flooded_areas": 4.0201409909346175e-12,
+      "normal": 1.0,
+      "traffic_incident": 9.307338233455198e-10
+    },
+    "inference_time_ms": 311.1112117767334,
+    "is_disaster": false,
+    "should_alert": false,
+    "filename": "normal_normal_image3973.jpg"
+  },
+  {
+    "predicted_class": "normal",
+    "confidence": 0.9999949932098389,
+    "probabilities": {
+      "collapsed_building": 4.418811840878334e-06,
+      "fire": 6.355147661452065e-07,
+      "flooded_areas": 8.184651179021785e-09,
+      "normal": 0.9999949932098389,
+      "traffic_incident": 7.656733025385165e-09
+    },
+    "inference_time_ms": 54.724931716918945,
+    "is_disaster": false,
+    "should_alert": false,
+    "filename": "normal_normal_image1802.jpg"
+  },
+  {
+    "predicted_class": "collapsed_building",
+    "confidence": 0.999934196472168,
+    "probabilities": {
+      "collapsed_building": 0.999934196472168,
+      "fire": 6.480626325355843e-06,
+      "flooded_areas": 3.0984740533313015e-06,
+      "normal": 4.6909026423236355e-05,
+      "traffic_incident": 9.297979886468966e-06
+    },
+    "inference_time_ms": 55.07612228393555,
+    "is_disaster": true,
+    "should_alert": 
