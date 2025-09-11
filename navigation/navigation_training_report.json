@@ -1,0 +1,16 @@
+{
+  "training_completed": "2025-09-07T17:45:30.254391",
+  "total_episodes": 1800,
+  "final_success_rate": 0.98,
+  "average_reward": 159.68968322474092,
+  "navigation_efficiency": 0.0145413720986059,
+  "classifier_model": "efficientnet_b0",
+  "environment_size": "50x50",
+  "disaster_classes": [
+    "collapsed_building",
+    "fire",
+    "flooded_areas",
+    "normal",
+    "traffic_incident"
+  ]
+}
