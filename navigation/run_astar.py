@@ -51,14 +51,15 @@ def run_episode(env: UAVNavigationEnv, planner: AStarPlanner, render: bool = Fal
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--episodes", type=int, default=50)
+    parser.add_argument("--episodes", type=int, default=10)
     parser.add_argument("--grid", type=int, default=50)
     parser.add_argument("--max_steps", type=int, default=200)
     parser.add_argument("--classifier", type=str, default="../checkpoints/best_model.pth")
     parser.add_argument("--render", action="store_true")
+    parser.add_argument("--no-cache", action="store_true", help="Disable image caching")
     args = parser.parse_args()
 
-    env = UAVNavigationEnv(grid_size=args.grid, max_steps=args.max_steps, classifier_path=args.classifier)
+    env = UAVNavigationEnv(grid_size=args.grid, max_steps=args.max_steps, classifier_path=args.classifier, cache_imagery=not args.no_cache)
     planner = AStarPlanner(grid_size=args.grid, diag=True)
 
     successes = 0

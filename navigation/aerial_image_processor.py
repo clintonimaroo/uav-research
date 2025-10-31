@@ -28,6 +28,7 @@ class AerialImageProcessor:
             num_classes=self.config.num_classes
         )
         self.classifier.load_state_dict(checkpoint['model_state_dict'])
+        self.classifier.to(self.device)
         self.classifier.eval()
         
         _, self.transform = get_transforms(self.config.input_size, augment=False)
@@ -88,6 +89,9 @@ class AerialImageProcessor:
         
         cell_size = aerial_image.shape[0] // grid_size
         
+        batch_images = []
+        batch_coords = []
+        
         for i in range(grid_size):
             for j in range(grid_size):
                 x_start = i * cell_size
@@ -96,10 +100,33 @@ class AerialImageProcessor:
                 y_end = (j + 1) * cell_size
                 
                 cell_image = aerial_image[x_start:x_end, y_start:y_end]
+                image_pil = Image.fromarray(cell_image)
+                image_tensor = self.transform(image_pil)
+                batch_images.append(image_tensor)
+                batch_coords.append((i, j))
+        
+        if batch_images:
+            batch_tensor = torch.stack(batch_images).to(self.device)
+            
+            with torch.no_grad():
+                outputs = self.classifier(batch_tensor)
+                probabilities = torch.softmax(outputs, dim=1)
                 
-                hazard_prob, confidence = self._classify_image_patch(cell_image)
-                hazard_map[i, j] = hazard_prob
-                confidence_map[i, j] = confidence
+                disaster_classes = ['fire', 'collapsed_building', 'flooded_areas', 'traffic_incident']
+                
+                for idx, (i, j) in enumerate(batch_coords):
+                    disaster_prob = 0.0
+                    max_confidence = 0.0
+                    
+                    for cls in disaster_classes:
+                        if cls in self.class_to_idx:
+                            prob = probabilities[idx][self.class_to_idx[cls]].item()
+                            disaster_prob += prob
+                            max_confidence = max(max_confidence, prob)
+                    
+                    overall_confidence = torch.max(probabilities[idx]).item()
+                    hazard_map[i, j] = min(disaster_prob, 1.0)
+                    confidence_map[i, j] = overall_confidence
         
         return hazard_map, confidence_map
     

@@ -12,8 +12,8 @@ from uav_environment import UAVNavigationEnv
 from ppo_navigation import PPONavigationAgent
 
 class UAVNavigationSystem:
-    def __init__(self, grid_size: int = 50, max_episode_steps: int = 200):
-        self.env = UAVNavigationEnv(grid_size=grid_size, max_steps=max_episode_steps)
+    def __init__(self, grid_size: int = 50, max_episode_steps: int = 200, cache_imagery: bool = True):
+        self.env = UAVNavigationEnv(grid_size=grid_size, max_steps=max_episode_steps, cache_imagery=cache_imagery)
         self.agent = PPONavigationAgent(
             input_shape=self.env.observation_space.shape,
             action_dim=self.env.action_space.n,

@@ -6,7 +6,6 @@ import json
 
 @dataclass
 class TrainingConfig:
-    """Configuration for training disaster detection models"""
     
     dataset_path: str = "data/aider_ dataset/"
     classes: List[str] = None
