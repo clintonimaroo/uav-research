@@ -1,8 +1,13 @@
 import torch
 import torch.nn as nn
 import torchvision.models as models
-from torchvision.models import MobileNet_V2_Weights, EfficientNet_B0_Weights
 from typing import Optional
+
+try:
+    from torchvision.models import MobileNet_V2_Weights, EfficientNet_B0_Weights
+    TORCHVISION_NEW = True
+except ImportError:
+    TORCHVISION_NEW = False
 
 class DisasterClassifier(nn.Module):
     """Base class for disaster detection models"""
@@ -21,7 +26,10 @@ class DisasterClassifier(nn.Module):
     
     def _create_mobilenet_v2(self):
         """Create MobileNetV2 model for disaster detection"""
-        model = models.mobilenet_v2(weights=MobileNet_V2_Weights.IMAGENET1K_V1)
+        if TORCHVISION_NEW:
+            model = models.mobilenet_v2(weights=MobileNet_V2_Weights.IMAGENET1K_V1)
+        else:
+            model = models.mobilenet_v2(pretrained=True)
         
         model.classifier = nn.Sequential(
             nn.Dropout(0.2),
@@ -32,7 +40,10 @@ class DisasterClassifier(nn.Module):
     
     def _create_efficientnet_b0(self):
         """Create EfficientNet-B0 model for disaster detection"""
-        model = models.efficientnet_b0(weights=EfficientNet_B0_Weights.IMAGENET1K_V1)
+        if TORCHVISION_NEW:
+            model = models.efficientnet_b0(weights=EfficientNet_B0_Weights.IMAGENET1K_V1)
+        else:
+            model = models.efficientnet_b0(pretrained=True)
         
         model.classifier = nn.Sequential(
             nn.Dropout(0.2, inplace=True),
