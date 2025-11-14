@@ -47,7 +47,7 @@ class UAVNavigationEnv(gym.Env):
         
     def _load_disaster_classifier(self, model_path: str):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        checkpoint = torch.load(model_path, map_location=self.device, weights_only=False)
+        checkpoint = torch.load(model_path, map_location=self.device)
         
         self.config = checkpoint['config']
         self.class_to_idx = checkpoint['class_to_idx']
