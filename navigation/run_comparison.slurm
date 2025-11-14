@@ -7,7 +7,6 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem-per-cpu=1900M
-#SBATCH --partition=RM-shared
 
 # Change to the navigation directory
 cd /ocean/projects/cis250165p/cimaro/uav-research/navigation
