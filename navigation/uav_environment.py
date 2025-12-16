@@ -33,6 +33,7 @@ class UAVNavigationEnv(gym.Env):
         self.cached_aerial_image = None
         self.observed_cells = set()
         self.last_update_step = {}
+        self.previous_distance = None
         
         self.action_space = spaces.Discrete(8)
         self.observation_space = spaces.Box(
@@ -230,26 +231,29 @@ class UAVNavigationEnv(gym.Env):
         goal_distance = np.linalg.norm(self.uav_position - self.goal_position)
         
         if np.array_equal(self.uav_position, self.goal_position):
-            return 500.0
+            goal_reward = 1000.0
+            self.previous_distance = None
+            return goal_reward
         
-        progress_reward = 100.0 / (1.0 + goal_distance)
+        progress_reward = 0.0
+        if self.previous_distance is not None:
+            distance_change = self.previous_distance - goal_distance
+            if distance_change > 0:
+                progress_reward = 1.0
+            elif distance_change < 0:
+                progress_reward = -1.0
+        
+        self.previous_distance = goal_distance
+        
+        step_penalty = -0.1
         
         hazard_level = max(0.0, self.hazard_map[self.uav_position[0], self.uav_position[1]])
         
-        if hazard_level > 0.8:
-            safety_penalty = -500.0 * (hazard_level ** 3)
-        elif hazard_level > 0.5:
-            safety_penalty = -300.0 * (hazard_level ** 2)
-        elif hazard_level > 0.2:
-            safety_penalty = -100.0 * hazard_level
-        else:
-            safety_penalty = -10.0 * hazard_level
+        hazard_penalty = -50.0 * hazard_level
         
-        efficiency_penalty = -0.5
+        collision_penalty = -1000.0 if hazard_level > 0.9 else 0.0
         
-        collision_penalty = -2000.0 if hazard_level > 0.9 else 0.0
-        
-        return progress_reward + safety_penalty + efficiency_penalty + collision_penalty
+        return progress_reward + step_penalty + hazard_penalty + collision_penalty
     
     def _check_terminal_conditions(self) -> bool:
         if np.array_equal(self.uav_position, self.goal_position):
@@ -263,7 +267,9 @@ class UAVNavigationEnv(gym.Env):
     
     def reset(self) -> np.ndarray:
         self.current_step = 0
+        self.previous_distance = None
         self._initialize_environment()
+        self.previous_distance = np.linalg.norm(self.uav_position - self.goal_position)
         return self._get_observation()
     
     def render_static(self, title="UAV Navigation"):

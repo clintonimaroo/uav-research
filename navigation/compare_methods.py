@@ -251,7 +251,7 @@ def generate_comparison_report(astar_results: Dict, ppo_results: Dict,
 
 def main():
     parser = argparse.ArgumentParser(description='Compare A* vs PPO navigation methods')
-    parser.add_argument("--episodes", type=int, default=50, help="Number of episodes to evaluate per method")
+    parser.add_argument("--episodes", type=int, default=300, help="Number of episodes to evaluate per method")
     parser.add_argument("--grid", type=int, default=50, help="Grid size")
     parser.add_argument("--max_steps", type=int, default=200, help="Maximum steps per episode")
     parser.add_argument("--classifier", type=str, default="../checkpoints/best_model.pth", 
