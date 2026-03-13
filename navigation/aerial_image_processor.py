@@ -17,7 +17,7 @@ class AerialImageProcessor:
         self._load_classifier(classifier_path)
         
     def _load_classifier(self, model_path: str):
-        checkpoint = torch.load(model_path, map_location=self.device)
+        checkpoint = torch.load(model_path, map_location=self.device, weights_only=False)
         
         self.config = checkpoint['config']
         self.class_to_idx = checkpoint['class_to_idx']

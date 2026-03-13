@@ -21,7 +21,9 @@ class UAVNavigationEnv(gym.Env):
                  classifier_path: str = "../checkpoints/best_model.pth", 
                  cache_imagery: bool = True,
                  observation_radius: int = 2,
-                 confidence_decay: float = 0.95):
+                 confidence_decay: float = 0.95,
+                 termination_threshold: float = 0.9,
+                 perception_noise_std: float = 0.0):
         super(UAVNavigationEnv, self).__init__()
         
         self.grid_size = grid_size
@@ -30,6 +32,8 @@ class UAVNavigationEnv(gym.Env):
         self.cache_imagery = cache_imagery
         self.observation_radius = observation_radius
         self.confidence_decay = confidence_decay
+        self.termination_threshold = termination_threshold
+        self.perception_noise_std = perception_noise_std
         self.cached_aerial_image = None
         self.observed_cells = set()
         self.last_update_step = {}
@@ -48,7 +52,7 @@ class UAVNavigationEnv(gym.Env):
         
     def _load_disaster_classifier(self, model_path: str):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        checkpoint = torch.load(model_path, map_location=self.device)
+        checkpoint = torch.load(model_path, map_location=self.device, weights_only=False)
         
         self.config = checkpoint['config']
         self.class_to_idx = checkpoint['class_to_idx']
@@ -67,6 +71,8 @@ class UAVNavigationEnv(gym.Env):
         self.grid = np.zeros((self.grid_size, self.grid_size))
         self.hazard_map = np.full((self.grid_size, self.grid_size), -1.0, dtype=np.float32)
         self.confidence_map = np.full((self.grid_size, self.grid_size), -1.0, dtype=np.float32)
+        self.gt_hazard_map = np.zeros((self.grid_size, self.grid_size), dtype=np.float32)
+        
         self.disaster_locations = []
         self.observed_cells = set()
         self.last_update_step = {}
@@ -75,8 +81,29 @@ class UAVNavigationEnv(gym.Env):
         self.goal_position = np.array([self.grid_size-3, self.grid_size-3])
         
         self._generate_aerial_scene()
+        self._compute_ground_truth_hazards()
         self._classify_local_area(self.uav_position)
         self.path_history = [self.uav_position.copy()]
+
+    def _compute_ground_truth_hazards(self):
+        self.gt_hazard_map.fill(0.0)
+        
+        for disaster in self.disaster_locations:
+            center_x, center_y = disaster['grid_coords']
+            intensity = disaster['intensity']
+            radius = int(np.clip(intensity * 4, 1, 4))
+            
+            for i in range(-radius, radius + 1):
+                for j in range(-radius, radius + 1):
+                    nx = center_x + i
+                    ny = center_y + j
+                    
+                    if 0 <= nx < self.grid_size and 0 <= ny < self.grid_size:
+                        distance = np.sqrt(i**2 + j**2)
+                        if distance <= radius:
+                            falloff = max(0.0, 1.0 - (distance / (radius + 1))**2)
+                            hazard_val = intensity * falloff
+                            self.gt_hazard_map[nx, ny] = max(self.gt_hazard_map[nx, ny], hazard_val)
 
     def _generate_aerial_scene(self):
         if self.cache_imagery and self.cached_aerial_image is not None:
@@ -130,6 +157,11 @@ class UAVNavigationEnv(gym.Env):
                 with torch.no_grad():
                     outputs = self.classifier(batch_tensor)
                     probabilities = torch.softmax(outputs, dim=1)
+                    
+                    if self.perception_noise_std > 0:
+                        noise = torch.randn_like(probabilities) * self.perception_noise_std
+                        probabilities = torch.clamp(probabilities + noise, 0.0, 1.0)
+                        probabilities = probabilities / probabilities.sum(dim=1, keepdim=True)
                     
                     disaster_classes = ['fire', 'collapsed_building', 'flooded_areas', 'traffic_incident']
                     
@@ -193,14 +225,14 @@ class UAVNavigationEnv(gym.Env):
         self._apply_confidence_decay()
         
         actions = {
-            0: [-1, 0],   # N
-            1: [-1, 1],   # NE
-            2: [0, 1],    # E
-            3: [1, 1],    # SE
-            4: [1, 0],    # S
-            5: [1, -1],   # SW
-            6: [0, -1],   # W
-            7: [-1, -1]   # NW
+            0: [-1, 0],   
+            1: [-1, 1],   
+            2: [0, 1],    
+            3: [1, 1],    
+            4: [1, 0],    
+            5: [1, -1],   
+            6: [0, -1],   
+            7: [-1, -1]   
         }
         
         new_position = self.uav_position + np.array(actions[action])
@@ -220,6 +252,7 @@ class UAVNavigationEnv(gym.Env):
             'uav_position': self.uav_position.copy(),
             'goal_position': self.goal_position.copy(),
             'hazard_level': hazard_level,
+            'gt_hazard_level': float(self.gt_hazard_map[self.uav_position[0], self.uav_position[1]]),
             'in_danger_zone': in_danger,
             'steps': self.current_step,
             'path_history': self.path_history.copy()
@@ -228,32 +261,35 @@ class UAVNavigationEnv(gym.Env):
         return self._get_observation(), reward, done, info
     
     def _calculate_reward(self) -> float:
+        R_GOAL = 1000.0
+        R_STEP = -0.1
+        R_PROGRESS = 1.0
+        R_REGRESS = -1.0
+        R_HAZARD_MAX = -50.0
+        R_COLLISION = -1000.0
+        
         goal_distance = np.linalg.norm(self.uav_position - self.goal_position)
         
         if np.array_equal(self.uav_position, self.goal_position):
-            goal_reward = 1000.0
             self.previous_distance = None
-            return goal_reward
+            return R_GOAL
         
         progress_reward = 0.0
         if self.previous_distance is not None:
             distance_change = self.previous_distance - goal_distance
             if distance_change > 0:
-                progress_reward = 1.0
+                progress_reward = R_PROGRESS
             elif distance_change < 0:
-                progress_reward = -1.0
+                progress_reward = R_REGRESS
         
         self.previous_distance = goal_distance
         
-        step_penalty = -0.1
-        
         hazard_level = max(0.0, self.hazard_map[self.uav_position[0], self.uav_position[1]])
+        hazard_penalty = R_HAZARD_MAX * hazard_level
         
-        hazard_penalty = -50.0 * hazard_level
+        collision_penalty = R_COLLISION if hazard_level > self.termination_threshold else 0.0
         
-        collision_penalty = -1000.0 if hazard_level > 0.9 else 0.0
-        
-        return progress_reward + step_penalty + hazard_penalty + collision_penalty
+        return progress_reward + R_STEP + hazard_penalty + collision_penalty
     
     def _check_terminal_conditions(self) -> bool:
         if np.array_equal(self.uav_position, self.goal_position):
@@ -261,7 +297,7 @@ class UAVNavigationEnv(gym.Env):
         if self.current_step >= self.max_steps:
             return True
         hazard_level = max(0.0, self.hazard_map[self.uav_position[0], self.uav_position[1]])
-        if hazard_level > 0.9:
+        if hazard_level > self.termination_threshold:
             return True
         return False
     

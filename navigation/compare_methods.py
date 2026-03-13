@@ -14,46 +14,75 @@ from astar_planner import AStarPlanner
 from ppo_navigation import PPONavigationAgent
 
 
-def run_astar_episode(env: UAVNavigationEnv, planner: AStarPlanner) -> Dict:
+def run_astar_episode(env: UAVNavigationEnv, planner: AStarPlanner, 
+                      encounter_threshold: float = 0.2) -> Dict:
     state = env.reset()
-    start = env.uav_position.copy()
-    goal = env.goal_position.copy()
     
-    path = planner.plan(env.hazard_map, start, goal)
-    
-    if len(path) < 2:
-        return {
-            "success": False,
-            "steps": 0,
-            "path_length": 0,
-            "final_distance": float(np.linalg.norm(env.uav_position - env.goal_position)),
-            "hazard_encounters": 0,
-            "total_reward": 0.0,
-            "hazard_penalty": 0.0,
-        }
-    
-    step_idx = 1
     hazard_hits = 0
     total_reward = 0.0
     steps = 0
     hazard_penalty = 0.0
+    geometric_path_length = 0.0
+    
+    # 1. First initial plan
+    current_path = planner.plan(env.hazard_map, env.uav_position, env.goal_position)
+    step_idx = 1
     
     while steps < env.max_steps:
-        if step_idx >= len(path):
-            break
-        next_pos = path[step_idx]
-        action = AStarPlanner.action_from_move(env.uav_position, next_pos)
+        # Check if we need to replan because we finished the path or the next step is blocked
+        needs_replan = False
+        if step_idx >= len(current_path):
+            needs_replan = True
+        else:
+            nx, ny = current_path[step_idx]
+            # Since env.hazard_map updates during env.step as UAV explores, 
+            # we check if our previously safe planned step is actually hazardous now
+            if env.hazard_map[nx, ny] > 0.2:
+                needs_replan = True
+                
+        if needs_replan:
+            current_path = planner.plan(env.hazard_map, env.uav_position, env.goal_position)
+            step_idx = 1
+            
+        # If no path found or we're at the goal
+        if len(current_path) < 2:
+            import random
+            action = random.randint(0, 7)
+            actions_map = {
+                0: [-1, 0], 1: [-1, 1], 2: [0, 1], 3: [1, 1],
+                4: [1, 0], 5: [1, -1], 6: [0, -1], 7: [-1, -1]
+            }
+            nx = env.uav_position[0] + actions_map[action][0]
+            ny = env.uav_position[1] + actions_map[action][1]
+            nx = max(0, min(env.grid_size - 1, nx))
+            ny = max(0, min(env.grid_size - 1, ny))
+            next_pos = np.array([nx, ny])
+        else:
+            # Take the immediate next step in the planned path
+            next_pos = current_path[step_idx]
+            action = AStarPlanner.action_from_move(env.uav_position, next_pos)
+        
+        prev_pos = env.uav_position.copy()
+        
         state, reward, done, info = env.step(action)
         total_reward += reward
-        hazard_level = info.get("hazard_level", 0.0)
-        if hazard_level > 0.2:
+        
+        step_distance = np.linalg.norm(env.uav_position - prev_pos)
+        geometric_path_length += float(step_distance)
+        
+        gt_hazard_level = info.get("gt_hazard_level", 0.0)
+        if gt_hazard_level > encounter_threshold:
             hazard_hits += 1
-            hazard_penalty += hazard_level
+            hazard_penalty += gt_hazard_level
+            
+        steps += 1
+        
+        # Advance path index if we successfully followed the plan
+        if len(current_path) >= 2 and np.array_equal(env.uav_position, next_pos):
+            step_idx += 1
+            
         if done:
             break
-        steps += 1
-        if np.array_equal(env.uav_position, next_pos):
-            step_idx += 1
     
     success = np.array_equal(env.uav_position, env.goal_position)
     final_distance = float(np.linalg.norm(env.uav_position - env.goal_position))
@@ -61,7 +90,7 @@ def run_astar_episode(env: UAVNavigationEnv, planner: AStarPlanner) -> Dict:
     return {
         "success": success,
         "steps": steps,
-        "path_length": int(len(path)),
+        "path_length": float(geometric_path_length),
         "final_distance": final_distance,
         "hazard_encounters": hazard_hits,
         "total_reward": float(total_reward),
@@ -69,21 +98,30 @@ def run_astar_episode(env: UAVNavigationEnv, planner: AStarPlanner) -> Dict:
     }
 
 
-def run_ppo_episode(env: UAVNavigationEnv, agent: PPONavigationAgent, deterministic: bool = True) -> Dict:
+def run_ppo_episode(env: UAVNavigationEnv, agent: PPONavigationAgent, deterministic: bool = True,
+                    encounter_threshold: float = 0.2) -> Dict:
     state = env.reset()
     hazard_hits = 0
     total_reward = 0.0
     steps = 0
     hazard_penalty = 0.0
+    geometric_path_length = 0.0
     
     while steps < env.max_steps:
         action = agent.select_action(state, deterministic=deterministic)
+        
+        prev_pos = env.uav_position.copy()
+        
         next_state, reward, done, info = env.step(action)
         total_reward += reward
-        hazard_level = info.get("hazard_level", 0.0)
-        if hazard_level > 0.2:
+        
+        step_distance = np.linalg.norm(env.uav_position - prev_pos)
+        geometric_path_length += float(step_distance)
+        
+        gt_hazard_level = info.get("gt_hazard_level", 0.0)
+        if gt_hazard_level > encounter_threshold:
             hazard_hits += 1
-            hazard_penalty += hazard_level
+            hazard_penalty += gt_hazard_level
         
         state = next_state
         steps += 1
@@ -99,7 +137,7 @@ def run_ppo_episode(env: UAVNavigationEnv, agent: PPONavigationAgent, determinis
     return {
         "success": success,
         "steps": steps,
-        "path_length": steps,  
+        "path_length": float(geometric_path_length),
         "final_distance": final_distance,
         "hazard_encounters": hazard_hits,
         "total_reward": float(total_reward),
@@ -108,7 +146,7 @@ def run_ppo_episode(env: UAVNavigationEnv, agent: PPONavigationAgent, determinis
 
 
 def evaluate_method(episodes: int, method: str, env: UAVNavigationEnv, 
-                    planner=None, agent=None) -> Dict:
+                    planner=None, agent=None, encounter_threshold: float = 0.2) -> Dict:
     print(f"\n{'='*60}")
     print(f"Evaluating {method} method for {episodes} episodes...")
     print(f"{'='*60}")
@@ -121,9 +159,9 @@ def evaluate_method(episodes: int, method: str, env: UAVNavigationEnv,
             print(f"Progress: {i+1}/{episodes} episodes ({100*(i+1)/episodes:.1f}%)")
         
         if method == "A*":
-            result = run_astar_episode(env, planner)
+            result = run_astar_episode(env, planner, encounter_threshold=encounter_threshold)
         elif method == "PPO":
-            result = run_ppo_episode(env, agent, deterministic=True)
+            result = run_ppo_episode(env, agent, deterministic=True, encounter_threshold=encounter_threshold)
         else:
             raise ValueError(f"Unknown method: {method}")
         
@@ -261,6 +299,12 @@ def main():
     parser.add_argument("--output_dir", type=str, default="comparison_results",
                        help="Directory to save comparison results")
     parser.add_argument("--no-cache", action="store_true", help="Disable image caching")
+    parser.add_argument("--encounter_threshold", type=float, default=0.2, 
+                       help="Hazard threshold for counting encounters")
+    parser.add_argument("--termination_threshold", type=float, default=0.9,
+                       help="Hazard threshold for terminal failure collision")
+    parser.add_argument("--perception_noise", type=float, default=0.0,
+                       help="Amount of perception noise (std dev) to add to image classifier outputs")
     args = parser.parse_args()
     
     print("="*60)
@@ -277,7 +321,9 @@ def main():
         grid_size=args.grid, 
         max_steps=args.max_steps, 
         classifier_path=args.classifier,
-        cache_imagery=not args.no_cache
+        cache_imagery=not args.no_cache,
+        termination_threshold=args.termination_threshold,
+        perception_noise_std=args.perception_noise
     )
     
     planner = AStarPlanner(grid_size=args.grid, diag=True)
@@ -297,9 +343,11 @@ def main():
         print(f"\n⚠ PPO model not found at: {model_path}")
         print("⚠ Running with untrained PPO agent (results may be poor)")
     
-    astar_results = evaluate_method(args.episodes, "A*", env, planner=planner)
+    astar_results = evaluate_method(args.episodes, "A*", env, planner=planner, 
+                                    encounter_threshold=args.encounter_threshold)
     
-    ppo_results = evaluate_method(args.episodes, "PPO", env, agent=agent)
+    ppo_results = evaluate_method(args.episodes, "PPO", env, agent=agent,
+                                  encounter_threshold=args.encounter_threshold)
     
     report = generate_comparison_report(astar_results, ppo_results, args.output_dir)
     
