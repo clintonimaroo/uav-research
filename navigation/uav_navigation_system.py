@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import torch
 import json
+import csv
 import os
 import time
 from datetime import datetime
@@ -31,6 +32,53 @@ class UAVNavigationSystem:
         
         self.checkpoint_dir = "navigation_models"
         os.makedirs(self.checkpoint_dir, exist_ok=True)
+        self.training_run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self.training_csv_path = os.path.join(
+            self.checkpoint_dir, f"training_episode_metrics_{self.training_run_id}.csv"
+        )
+        self.training_csv_fields = [
+            "run_id",
+            "episode",
+            "reward",
+            "steps",
+            "success",
+            "navigation_efficiency",
+            "goal_distance",
+            "grid_size",
+            "max_episode_steps",
+            "timestamp_utc",
+        ]
+        self._initialize_training_csv()
+
+    def _initialize_training_csv(self):
+        with open(self.training_csv_path, "w", newline="") as csv_file:
+            writer = csv.DictWriter(csv_file, fieldnames=self.training_csv_fields)
+            writer.writeheader()
+
+    def _append_training_episode_csv(
+        self,
+        episode: int,
+        reward: float,
+        steps: int,
+        success: bool,
+        navigation_efficiency: float,
+        goal_distance: float,
+    ):
+        row = {
+            "run_id": self.training_run_id,
+            "episode": episode,
+            "reward": float(reward),
+            "steps": int(steps),
+            "success": int(success),
+            "navigation_efficiency": float(navigation_efficiency),
+            "goal_distance": float(goal_distance),
+            "grid_size": int(self.env.grid_size),
+            "max_episode_steps": int(self.env.max_steps),
+            "timestamp_utc": datetime.utcnow().isoformat(),
+        }
+        with open(self.training_csv_path, "a", newline="") as csv_file:
+            writer = csv.DictWriter(csv_file, fieldnames=self.training_csv_fields)
+            writer.writerow(row)
         
     def train_navigation_system(self, total_episodes: int = 2000, 
                                update_frequency: int = 32, 
@@ -74,6 +122,14 @@ class UAVNavigationSystem:
             goal_distance = np.linalg.norm(info['uav_position'] - info['goal_position'])
             efficiency = 1.0 / (1.0 + goal_distance + episode_steps * 0.01)
             self.training_metrics['navigation_efficiency'].append(efficiency)
+            self._append_training_episode_csv(
+                episode=episode_count + 1,
+                reward=episode_reward,
+                steps=episode_steps,
+                success=success,
+                navigation_efficiency=efficiency,
+                goal_distance=goal_distance,
+            )
             
             if (episode_count + 1) % update_frequency == 0:
                 loss_info = self.agent.update_policy()
@@ -105,6 +161,7 @@ class UAVNavigationSystem:
             episode_count += 1
         
         print(f"\nTraining completed. Best success rate: {best_success_rate:.2%}")
+        print(f"Per-episode training CSV saved to: {self.training_csv_path}")
         self.generate_final_report()
     
     def demonstrate_navigation(self, episode_id: int = None, save_visualization: bool = False,

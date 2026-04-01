@@ -1,6 +1,7 @@
 import argparse
 import numpy as np
 import json
+import csv
 import time
 from datetime import datetime
 from typing import Dict, List
@@ -14,8 +15,12 @@ from astar_planner import AStarPlanner
 from ppo_navigation import PPONavigationAgent
 
 
-def run_astar_episode(env: UAVNavigationEnv, planner: AStarPlanner, 
-                      encounter_threshold: float = 0.2) -> Dict:
+def run_astar_episode(
+    env: UAVNavigationEnv,
+    planner: AStarPlanner,
+    encounter_threshold: float = 0.2,
+    replan_frequency: int = 0,
+) -> Dict:
     state = env.reset()
     
     hazard_hits = 0
@@ -24,27 +29,26 @@ def run_astar_episode(env: UAVNavigationEnv, planner: AStarPlanner,
     hazard_penalty = 0.0
     geometric_path_length = 0.0
     
-    # 1. First initial plan
     current_path = planner.plan(env.hazard_map, env.uav_position, env.goal_position)
     step_idx = 1
+    steps_since_replan = 0
     
     while steps < env.max_steps:
-        # Check if we need to replan because we finished the path or the next step is blocked
         needs_replan = False
         if step_idx >= len(current_path):
             needs_replan = True
         else:
             nx, ny = current_path[step_idx]
-            # Since env.hazard_map updates during env.step as UAV explores, 
-            # we check if our previously safe planned step is actually hazardous now
             if env.hazard_map[nx, ny] > 0.2:
                 needs_replan = True
+        if replan_frequency > 0 and steps_since_replan >= replan_frequency:
+            needs_replan = True
                 
         if needs_replan:
             current_path = planner.plan(env.hazard_map, env.uav_position, env.goal_position)
             step_idx = 1
+            steps_since_replan = 0
             
-        # If no path found or we're at the goal
         if len(current_path) < 2:
             import random
             action = random.randint(0, 7)
@@ -58,7 +62,6 @@ def run_astar_episode(env: UAVNavigationEnv, planner: AStarPlanner,
             ny = max(0, min(env.grid_size - 1, ny))
             next_pos = np.array([nx, ny])
         else:
-            # Take the immediate next step in the planned path
             next_pos = current_path[step_idx]
             action = AStarPlanner.action_from_move(env.uav_position, next_pos)
         
@@ -76,8 +79,8 @@ def run_astar_episode(env: UAVNavigationEnv, planner: AStarPlanner,
             hazard_penalty += gt_hazard_level
             
         steps += 1
+        steps_since_replan += 1
         
-        # Advance path index if we successfully followed the plan
         if len(current_path) >= 2 and np.array_equal(env.uav_position, next_pos):
             step_idx += 1
             
@@ -145,8 +148,15 @@ def run_ppo_episode(env: UAVNavigationEnv, agent: PPONavigationAgent, determinis
     }
 
 
-def evaluate_method(episodes: int, method: str, env: UAVNavigationEnv, 
-                    planner=None, agent=None, encounter_threshold: float = 0.2) -> Dict:
+def evaluate_method(
+    episodes: int,
+    method: str,
+    env: UAVNavigationEnv,
+    planner=None,
+    agent=None,
+    encounter_threshold: float = 0.2,
+    replan_frequency: int = 0,
+) -> Dict:
     print(f"\n{'='*60}")
     print(f"Evaluating {method} method for {episodes} episodes...")
     print(f"{'='*60}")
@@ -159,7 +169,12 @@ def evaluate_method(episodes: int, method: str, env: UAVNavigationEnv,
             print(f"Progress: {i+1}/{episodes} episodes ({100*(i+1)/episodes:.1f}%)")
         
         if method == "A*":
-            result = run_astar_episode(env, planner, encounter_threshold=encounter_threshold)
+            result = run_astar_episode(
+                env,
+                planner,
+                encounter_threshold=encounter_threshold,
+                replan_frequency=replan_frequency,
+            )
         elif method == "PPO":
             result = run_ppo_episode(env, agent, deterministic=True, encounter_threshold=encounter_threshold)
         else:
@@ -287,6 +302,143 @@ def generate_comparison_report(astar_results: Dict, ppo_results: Dict,
     return report
 
 
+def export_episode_results_csv(
+    astar_results: Dict,
+    ppo_results: Dict,
+    output_dir: str,
+    timestamp: str,
+    run_config: Dict,
+) -> str:
+    os.makedirs(output_dir, exist_ok=True)
+    csv_path = os.path.join(output_dir, f"episode_results_{timestamp}.csv")
+    fieldnames = [
+        "run_id",
+        "method",
+        "episode",
+        "success",
+        "steps",
+        "path_length",
+        "final_distance",
+        "hazard_encounters",
+        "total_reward",
+        "hazard_penalty",
+        "grid",
+        "max_steps",
+        "encounter_threshold",
+        "termination_threshold",
+        "perception_noise",
+        "replan_frequency",
+        "confidence_decay",
+        "observation_radius",
+        "timestamp_utc",
+    ]
+
+    with open(csv_path, "w", newline="") as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+        writer.writeheader()
+
+        for method_results in [astar_results, ppo_results]:
+            for episode_idx, episode_result in enumerate(method_results["results"], start=1):
+                writer.writerow(
+                    {
+                        "run_id": timestamp,
+                        "method": method_results["method"],
+                        "episode": episode_idx,
+                        "success": int(bool(episode_result["success"])),
+                        "steps": episode_result["steps"],
+                        "path_length": episode_result["path_length"],
+                        "final_distance": episode_result["final_distance"],
+                        "hazard_encounters": episode_result["hazard_encounters"],
+                        "total_reward": episode_result["total_reward"],
+                        "hazard_penalty": episode_result["hazard_penalty"],
+                        "grid": run_config["grid"],
+                        "max_steps": run_config["max_steps"],
+                        "encounter_threshold": run_config["encounter_threshold"],
+                        "termination_threshold": run_config["termination_threshold"],
+                        "perception_noise": run_config["perception_noise"],
+                        "replan_frequency": run_config["replan_frequency"],
+                        "confidence_decay": run_config["confidence_decay"],
+                        "observation_radius": run_config["observation_radius"],
+                        "timestamp_utc": datetime.utcnow().isoformat(),
+                    }
+                )
+
+    return csv_path
+
+
+def export_run_summary_csv(
+    astar_results: Dict,
+    ppo_results: Dict,
+    output_dir: str,
+    timestamp: str,
+    run_config: Dict,
+) -> str:
+    os.makedirs(output_dir, exist_ok=True)
+    csv_path = os.path.join(output_dir, "run_summary.csv")
+    fieldnames = [
+        "run_id",
+        "method",
+        "episodes",
+        "success_rate",
+        "successes",
+        "avg_steps",
+        "std_steps",
+        "avg_path_len",
+        "avg_final_dist",
+        "avg_hazard_encounters",
+        "avg_total_reward",
+        "std_reward",
+        "avg_hazard_penalty",
+        "elapsed_time",
+        "grid",
+        "max_steps",
+        "encounter_threshold",
+        "termination_threshold",
+        "perception_noise",
+        "replan_frequency",
+        "confidence_decay",
+        "observation_radius",
+        "timestamp_utc",
+    ]
+
+    file_exists = os.path.exists(csv_path)
+    with open(csv_path, "a", newline="") as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+        if not file_exists:
+            writer.writeheader()
+
+        for method_results in [astar_results, ppo_results]:
+            writer.writerow(
+                {
+                    "run_id": timestamp,
+                    "method": method_results["method"],
+                    "episodes": method_results["episodes"],
+                    "success_rate": method_results["success_rate"],
+                    "successes": method_results["successes"],
+                    "avg_steps": method_results["avg_steps"],
+                    "std_steps": method_results["std_steps"],
+                    "avg_path_len": method_results["avg_path_len"],
+                    "avg_final_dist": method_results["avg_final_dist"],
+                    "avg_hazard_encounters": method_results["avg_hazard_encounters"],
+                    "avg_total_reward": method_results["avg_total_reward"],
+                    "std_reward": method_results["std_reward"],
+                    "avg_hazard_penalty": method_results["avg_hazard_penalty"],
+                    "elapsed_time": method_results["elapsed_time"],
+                    "grid": run_config["grid"],
+                    "max_steps": run_config["max_steps"],
+                    "encounter_threshold": run_config["encounter_threshold"],
+                    "termination_threshold": run_config["termination_threshold"],
+                    "perception_noise": run_config["perception_noise"],
+                    "replan_frequency": run_config["replan_frequency"],
+                    "confidence_decay": run_config["confidence_decay"],
+                    "observation_radius": run_config["observation_radius"],
+                    "timestamp_utc": datetime.utcnow().isoformat(),
+                }
+            )
+
+    return csv_path
+
+
 def main():
     parser = argparse.ArgumentParser(description='Compare A* vs PPO navigation methods')
     parser.add_argument("--episodes", type=int, default=300, help="Number of episodes to evaluate per method")
@@ -305,7 +457,14 @@ def main():
                        help="Hazard threshold for terminal failure collision")
     parser.add_argument("--perception_noise", type=float, default=0.0,
                        help="Amount of perception noise (std dev) to add to image classifier outputs")
+    parser.add_argument("--replan_frequency", type=int, default=0,
+                       help="A* forced replan cadence in steps (0 means on-demand only)")
+    parser.add_argument("--confidence_decay", type=float, default=0.95,
+                       help="Confidence decay factor for hazard confidence memory")
+    parser.add_argument("--observation_radius", type=int, default=2,
+                       help="Radius of local cell classification around UAV")
     args = parser.parse_args()
+    run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     
     print("="*60)
     print("UAV Navigation Methods Comparison")
@@ -315,6 +474,9 @@ def main():
     print(f"Max steps per episode: {args.max_steps}")
     print(f"Classifier: {args.classifier}")
     print(f"PPO Model: {args.ppo_model}")
+    print(f"A* Replan Frequency: {args.replan_frequency} (0=on-demand)")
+    print(f"Confidence Decay: {args.confidence_decay}")
+    print(f"Observation Radius: {args.observation_radius}")
     print("="*60)
     
     env = UAVNavigationEnv(
@@ -322,6 +484,8 @@ def main():
         max_steps=args.max_steps, 
         classifier_path=args.classifier,
         cache_imagery=not args.no_cache,
+        observation_radius=args.observation_radius,
+        confidence_decay=args.confidence_decay,
         termination_threshold=args.termination_threshold,
         perception_noise_std=args.perception_noise
     )
@@ -344,14 +508,33 @@ def main():
         print("⚠ Running with untrained PPO agent (results may be poor)")
     
     astar_results = evaluate_method(args.episodes, "A*", env, planner=planner, 
-                                    encounter_threshold=args.encounter_threshold)
+                                    encounter_threshold=args.encounter_threshold,
+                                    replan_frequency=args.replan_frequency)
     
     ppo_results = evaluate_method(args.episodes, "PPO", env, agent=agent,
                                   encounter_threshold=args.encounter_threshold)
     
     report = generate_comparison_report(astar_results, ppo_results, args.output_dir)
+    run_config = {
+        "grid": args.grid,
+        "max_steps": args.max_steps,
+        "encounter_threshold": args.encounter_threshold,
+        "termination_threshold": args.termination_threshold,
+        "perception_noise": args.perception_noise,
+        "replan_frequency": args.replan_frequency,
+        "confidence_decay": args.confidence_decay,
+        "observation_radius": args.observation_radius,
+    }
+    episode_csv_path = export_episode_results_csv(
+        astar_results, ppo_results, args.output_dir, run_id, run_config
+    )
+    summary_csv_path = export_run_summary_csv(
+        astar_results, ppo_results, args.output_dir, run_id, run_config
+    )
     
     print("\nComparison completed successfully!")
+    print(f"Episode-level CSV saved to: {episode_csv_path}")
+    print(f"Run-summary CSV saved to: {summary_csv_path}")
 
 
 if __name__ == "__main__":
