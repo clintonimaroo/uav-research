@@ -1,0 +1,2 @@
+method,frames,forward_count,turn_left_count,turn_right_count,slow_or_hold_count,avg_mae_disparity_px,avg_rmse_disparity_px,avg_bad_pixel_3px_rate,avg_bad_pixel_5pct_rate,avg_valid_estimate_fraction,avg_robust_min_depth_m,avg_mean_depth_m,avg_obstacle_fraction,avg_max_risk_fraction,avg_center_alert_fraction,avg_inference_latency_ms
+OpenCV StereoSGBM,15,0,3,12,0,42.675042692820234,46.64351100921631,0.9827366104035389,0.9561061011953138,0.6652509002057613,0.339490669965744,0.38776511351267495,0.6652509002057613,0.6652509002057613,0.8360597993827158,11.867900066499715

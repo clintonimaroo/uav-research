@@ -5,3 +5,5 @@ demo_outputs/
 venv/
 conference_101719.tex
 navigation/*.log
+data/uav_stereo
+docs
