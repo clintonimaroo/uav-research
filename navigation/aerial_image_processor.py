@@ -5,16 +5,35 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import sys
 import os
+from typing import Optional, Any, Dict
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import TrainingConfig
 from models import create_model
 from disaster_dataset import get_transforms
 
 class AerialImageProcessor:
-    def __init__(self, classifier_path: str = "../checkpoints/best_model.pth"):
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self._load_classifier(classifier_path)
+    def __init__(
+        self,
+        classifier_path: str = "../checkpoints/best_model.pth",
+        *,
+        shared_classifier: Optional[torch.nn.Module] = None,
+        shared_transform: Any = None,
+        shared_device: Optional[torch.device] = None,
+        shared_class_to_idx: Optional[Dict[str, int]] = None,
+        shared_config: Any = None,
+    ):
+        if shared_classifier is not None:
+            self.device = shared_device or torch.device(
+                "cuda" if torch.cuda.is_available() else "cpu"
+            )
+            self.classifier = shared_classifier
+            self.transform = shared_transform
+            self.class_to_idx = shared_class_to_idx or {}
+            self.config = shared_config
+            self.idx_to_class = {v: k for k, v in self.class_to_idx.items()}
+        else:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            self._load_classifier(classifier_path)
         
     def _load_classifier(self, model_path: str):
         checkpoint = torch.load(model_path, map_location=self.device, weights_only=False)
@@ -22,19 +41,26 @@ class AerialImageProcessor:
         self.config = checkpoint['config']
         self.class_to_idx = checkpoint['class_to_idx']
         self.idx_to_class = {v: k for k, v in self.class_to_idx.items()}
-        
+        state_dict = checkpoint['model_state_dict']
+        del checkpoint
+
         self.classifier = create_model(
             model_name=self.config.model_name,
             num_classes=self.config.num_classes
         )
-        self.classifier.load_state_dict(checkpoint['model_state_dict'])
+        self.classifier.load_state_dict(state_dict)
+        del state_dict
         self.classifier.to(self.device)
         self.classifier.eval()
         
         _, self.transform = get_transforms(self.config.input_size, augment=False)
         
-    def generate_aerial_scene(self, grid_size: int = 30) -> np.ndarray:
-        aerial_image = np.zeros((grid_size * 20, grid_size * 20, 3), dtype=np.uint8)
+    def generate_aerial_scene(self, grid_size: int = 30, cell_px: int = 20):
+        """cell_px: pixels per grid cell side (default 20). Lower values use less RAM (e.g. 10)."""
+        px = max(4, int(cell_px))
+        side = grid_size * px
+        margin = max(3, min(50, px * 2))
+        aerial_image = np.zeros((side, side, 3), dtype=np.uint8)
         
         aerial_image[:, :] = [34, 139, 34]
         
@@ -44,8 +70,8 @@ class AerialImageProcessor:
         for _ in range(num_disasters):
             disaster_type = np.random.choice(['fire', 'collapsed_building', 'flooded_areas', 'traffic_incident'])
             
-            center_x = np.random.randint(50, grid_size * 20 - 50)
-            center_y = np.random.randint(50, grid_size * 20 - 50)
+            center_x = np.random.randint(margin, side - margin)
+            center_y = np.random.randint(margin, side - margin)
             
             size = np.random.randint(30, 80)
             
@@ -66,9 +92,9 @@ class AerialImageProcessor:
             
             noise = np.random.randint(-30, 30, (size*2, size*2, 3))
             x_start = max(0, center_x - size)
-            x_end = min(grid_size * 20, center_x + size)
+            x_end = min(side, center_x + size)
             y_start = max(0, center_y - size)
-            y_end = min(grid_size * 20, center_y + size)
+            y_end = min(side, center_y + size)
             
             area = aerial_image[x_start:x_end, y_start:y_end]
             noise_area = noise[:area.shape[0], :area.shape[1]]
@@ -76,9 +102,9 @@ class AerialImageProcessor:
             
             disaster_locations.append({
                 'type': disaster_type,
-                'position': (center_x // 20, center_y // 20),
+                'position': (center_x // px, center_y // px),
                 'intensity': intensity,
-                'grid_coords': (center_x // 20, center_y // 20)
+                'grid_coords': (center_x // px, center_y // px)
             })
         
         return aerial_image.astype(np.uint8), disaster_locations

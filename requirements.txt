@@ -1,9 +1,16 @@
-# Core dependencies - compatible with Python 3.6 and older PyTorch
-torch==1.10.1
-torchvision==0.11.2
-numpy>=1.18.0,<2.0
-opencv-python-headless==4.2.0.34
-Pillow>=8.0.0,<10.0
+# Use Python 3.9–3.12 (recommended: 3.9 or 3.10 on Apple Silicon).
+# Python 3.13+ is not recommended here: legacy requirements pinned torch 1.10,
+# which is incompatible; a 3.13 venv can leave PyTorch in a broken state.
+#
+# Install PyTorch first (CPU/MPS wheels), then the rest:
+#   pip install torch torchvision torchaudio
+#   pip install -r requirements.txt
+
+torch>=2.2.0
+torchvision>=0.17.0
+numpy>=1.26.0,<2.0
+opencv-python-headless>=4.5.0,<4.11
+Pillow>=8.0.0
 matplotlib>=3.3.0
 seaborn>=0.11.0
 scikit-learn>=0.24.0
@@ -11,4 +18,4 @@ tqdm>=4.60.0
 pandas>=1.1.0
 tensorboard>=2.7.0
 pyyaml>=5.4.0
-gym>=0.26.0 
+gym>=0.26.0

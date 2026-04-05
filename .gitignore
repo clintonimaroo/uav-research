@@ -2,4 +2,5 @@
 __pycache__/
 demo_outputs/
 .venv/
+venv/
 conference_101719.tex

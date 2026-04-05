@@ -1,8 +1,11 @@
 import argparse
+import gc
+import sys
 import numpy as np
 import json
 import csv
 import time
+import torch
 from datetime import datetime
 from typing import Dict, List
 import sys
@@ -156,17 +159,21 @@ def evaluate_method(
     agent=None,
     encounter_threshold: float = 0.2,
     replan_frequency: int = 0,
+    progress_every: int = 0,
 ) -> Dict:
     print(f"\n{'='*60}")
     print(f"Evaluating {method} method for {episodes} episodes...")
     print(f"{'='*60}")
+    sys.stdout.flush()
     
     results = []
     start_time = time.time()
+    stride = progress_every if progress_every > 0 else max(1, episodes // 10)
     
     for i in range(episodes):
-        if (i + 1) % max(1, episodes // 10) == 0:
+        if (i + 1) % stride == 0 or (i + 1) == episodes:
             print(f"Progress: {i+1}/{episodes} episodes ({100*(i+1)/episodes:.1f}%)")
+            sys.stdout.flush()
         
         if method == "A*":
             result = run_astar_episode(
@@ -181,6 +188,11 @@ def evaluate_method(
             raise ValueError(f"Unknown method: {method}")
         
         results.append(result)
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        if torch.backends.mps.is_available():
+            torch.mps.empty_cache()
     
     elapsed_time = time.time() - start_time
     
@@ -330,6 +342,7 @@ def export_episode_results_csv(
         "replan_frequency",
         "confidence_decay",
         "observation_radius",
+        "aerial_cell_px",
         "timestamp_utc",
     ]
 
@@ -359,6 +372,7 @@ def export_episode_results_csv(
                         "replan_frequency": run_config["replan_frequency"],
                         "confidence_decay": run_config["confidence_decay"],
                         "observation_radius": run_config["observation_radius"],
+                        "aerial_cell_px": run_config["aerial_cell_px"],
                         "timestamp_utc": datetime.utcnow().isoformat(),
                     }
                 )
@@ -398,6 +412,7 @@ def export_run_summary_csv(
         "replan_frequency",
         "confidence_decay",
         "observation_radius",
+        "aerial_cell_px",
         "timestamp_utc",
     ]
 
@@ -432,6 +447,7 @@ def export_run_summary_csv(
                     "replan_frequency": run_config["replan_frequency"],
                     "confidence_decay": run_config["confidence_decay"],
                     "observation_radius": run_config["observation_radius"],
+                    "aerial_cell_px": run_config["aerial_cell_px"],
                     "timestamp_utc": datetime.utcnow().isoformat(),
                 }
             )
@@ -451,6 +467,11 @@ def main():
     parser.add_argument("--output_dir", type=str, default="comparison_results",
                        help="Directory to save comparison results")
     parser.add_argument("--no-cache", action="store_true", help="Disable image caching")
+    parser.add_argument(
+        "--verbose-scene",
+        action="store_true",
+        help="Print every synthetic aerial scene generation (very noisy with --no-cache)",
+    )
     parser.add_argument("--encounter_threshold", type=float, default=0.2, 
                        help="Hazard threshold for counting encounters")
     parser.add_argument("--termination_threshold", type=float, default=0.9,
@@ -463,8 +484,18 @@ def main():
                        help="Confidence decay factor for hazard confidence memory")
     parser.add_argument("--observation_radius", type=int, default=2,
                        help="Radius of local cell classification around UAV")
+    parser.add_argument("--aerial_cell_px", type=int, default=8,
+                       help="Pixels per grid cell in synthetic aerial raster (lower=less RAM; default 8)")
+    parser.add_argument("--low_memory", action="store_true",
+                       help="Extra safety: cap max_steps at 200 and log progress every episode")
     args = parser.parse_args()
     run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+    if args.low_memory:
+        args.max_steps = min(args.max_steps, 200)
+        print(f"Low-memory mode: max_steps capped to {args.max_steps}", flush=True)
+
+    torch.set_num_threads(1)
     
     print("="*60)
     print("UAV Navigation Methods Comparison")
@@ -477,8 +508,12 @@ def main():
     print(f"A* Replan Frequency: {args.replan_frequency} (0=on-demand)")
     print(f"Confidence Decay: {args.confidence_decay}")
     print(f"Observation Radius: {args.observation_radius}")
+    print(f"Aerial cell px: {args.aerial_cell_px}")
+    print(f"Low memory: {args.low_memory}")
     print("="*60)
     
+    progress_every = 1 if args.low_memory else 0
+
     env = UAVNavigationEnv(
         grid_size=args.grid, 
         max_steps=args.max_steps, 
@@ -487,15 +522,34 @@ def main():
         observation_radius=args.observation_radius,
         confidence_decay=args.confidence_decay,
         termination_threshold=args.termination_threshold,
-        perception_noise_std=args.perception_noise
+        perception_noise_std=args.perception_noise,
+        lightweight_info=True,
+        aerial_cell_px=args.aerial_cell_px,
+        quiet_scene=not args.verbose_scene,
     )
     
     planner = AStarPlanner(grid_size=args.grid, diag=True)
-    
+
+    astar_results = evaluate_method(
+        args.episodes,
+        "A*",
+        env,
+        planner=planner,
+        encounter_threshold=args.encounter_threshold,
+        replan_frequency=args.replan_frequency,
+        progress_every=progress_every,
+    )
+
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    if torch.backends.mps.is_available():
+        torch.mps.empty_cache()
+
     input_shape = (args.grid, args.grid, 4)
     action_dim = 8
     agent = PPONavigationAgent(input_shape, action_dim)
-    
+
     model_path = args.ppo_model
     if os.path.exists(model_path):
         print(f"\nLoading PPO model from: {model_path}")
@@ -506,13 +560,15 @@ def main():
     else:
         print(f"\n⚠ PPO model not found at: {model_path}")
         print("⚠ Running with untrained PPO agent (results may be poor)")
-    
-    astar_results = evaluate_method(args.episodes, "A*", env, planner=planner, 
-                                    encounter_threshold=args.encounter_threshold,
-                                    replan_frequency=args.replan_frequency)
-    
-    ppo_results = evaluate_method(args.episodes, "PPO", env, agent=agent,
-                                  encounter_threshold=args.encounter_threshold)
+
+    ppo_results = evaluate_method(
+        args.episodes,
+        "PPO",
+        env,
+        agent=agent,
+        encounter_threshold=args.encounter_threshold,
+        progress_every=progress_every,
+    )
     
     report = generate_comparison_report(astar_results, ppo_results, args.output_dir)
     run_config = {
@@ -524,6 +580,7 @@ def main():
         "replan_frequency": args.replan_frequency,
         "confidence_decay": args.confidence_decay,
         "observation_radius": args.observation_radius,
+        "aerial_cell_px": args.aerial_cell_px,
     }
     episode_csv_path = export_episode_results_csv(
         astar_results, ppo_results, args.output_dir, run_id, run_config

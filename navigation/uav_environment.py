@@ -23,17 +23,23 @@ class UAVNavigationEnv(gym.Env):
                  observation_radius: int = 2,
                  confidence_decay: float = 0.95,
                  termination_threshold: float = 0.9,
-                 perception_noise_std: float = 0.0):
+                 perception_noise_std: float = 0.0,
+                 lightweight_info: bool = False,
+                 aerial_cell_px: int = 20,
+                 quiet_scene: bool = False):
         super(UAVNavigationEnv, self).__init__()
         
         self.grid_size = grid_size
         self.max_steps = max_steps
+        self.aerial_cell_px = max(4, int(aerial_cell_px))
         self.current_step = 0
         self.cache_imagery = cache_imagery
+        self.quiet_scene = quiet_scene
         self.observation_radius = observation_radius
         self.confidence_decay = confidence_decay
         self.termination_threshold = termination_threshold
         self.perception_noise_std = perception_noise_std
+        self.lightweight_info = lightweight_info
         self.cached_aerial_image = None
         self.observed_cells = set()
         self.last_update_step = {}
@@ -47,7 +53,14 @@ class UAVNavigationEnv(gym.Env):
         )
         
         self._load_disaster_classifier(classifier_path)
-        self.aerial_processor = AerialImageProcessor(classifier_path)
+        self.aerial_processor = AerialImageProcessor(
+            classifier_path,
+            shared_classifier=self.classifier,
+            shared_transform=self.transform,
+            shared_device=self.device,
+            shared_class_to_idx=self.class_to_idx,
+            shared_config=self.config,
+        )
         self._initialize_environment()
         
     def _load_disaster_classifier(self, model_path: str):
@@ -56,12 +69,15 @@ class UAVNavigationEnv(gym.Env):
         
         self.config = checkpoint['config']
         self.class_to_idx = checkpoint['class_to_idx']
-        
+        state_dict = checkpoint['model_state_dict']
+        del checkpoint
+
         self.classifier = create_model(
             model_name=self.config.model_name,
             num_classes=self.config.num_classes
         )
-        self.classifier.load_state_dict(checkpoint['model_state_dict'])
+        self.classifier.load_state_dict(state_dict)
+        del state_dict
         self.classifier.to(self.device)
         self.classifier.eval()
         
@@ -79,6 +95,7 @@ class UAVNavigationEnv(gym.Env):
         
         self.uav_position = np.array([2, 2])
         self.goal_position = np.array([self.grid_size-3, self.grid_size-3])
+        self._max_distance = np.linalg.norm(self.goal_position - self.uav_position)
         
         self._generate_aerial_scene()
         self._compute_ground_truth_hazards()
@@ -107,18 +124,24 @@ class UAVNavigationEnv(gym.Env):
 
     def _generate_aerial_scene(self):
         if self.cache_imagery and self.cached_aerial_image is not None:
-            self.aerial_image = self.cached_aerial_image.copy()
-            self.disaster_locations = self.cached_disaster_locations.copy()
+            # Reuse the same arrays (read-only during navigation). Avoids a full
+            # image copy on every reset, which was doubling RAM (~grid^2 * cell_px^2).
+            self.aerial_image = self.cached_aerial_image
+            self.disaster_locations = self.cached_disaster_locations
             return
         
-        print("Generating aerial imagery...")
-        self.aerial_image, self.disaster_locations = self.aerial_processor.generate_aerial_scene(self.grid_size)
+        if not self.quiet_scene:
+            print("Generating aerial imagery...")
+        self.aerial_image, self.disaster_locations = self.aerial_processor.generate_aerial_scene(
+            self.grid_size, cell_px=self.aerial_cell_px
+        )
         
         if self.cache_imagery:
-            self.cached_aerial_image = self.aerial_image.copy()
-            self.cached_disaster_locations = self.disaster_locations.copy()
+            self.cached_aerial_image = self.aerial_image
+            self.cached_disaster_locations = self.disaster_locations
         
-        print(f"Generated aerial imagery: {len(self.disaster_locations)} disaster zones")
+        if not self.quiet_scene:
+            print(f"Generated aerial imagery: {len(self.disaster_locations)} disaster zones")
     
     def _classify_local_area(self, position: np.ndarray):
         x, y = position
@@ -154,7 +177,7 @@ class UAVNavigationEnv(gym.Env):
             if batch_images:
                 batch_tensor = torch.stack(batch_images).to(self.device)
                 
-                with torch.no_grad():
+                with torch.inference_mode():
                     outputs = self.classifier(batch_tensor)
                     probabilities = torch.softmax(outputs, dim=1)
                     
@@ -178,6 +201,8 @@ class UAVNavigationEnv(gym.Env):
                         self.confidence_map[i, j] = overall_confidence
                         self.observed_cells.add((i, j))
                         self.last_update_step[(i, j)] = self.current_step
+                    del outputs, probabilities
+                del batch_tensor
     
     def _apply_confidence_decay(self):
         for (i, j) in list(self.observed_cells):
@@ -188,20 +213,31 @@ class UAVNavigationEnv(gym.Env):
     
     def _get_observation(self):
         obs = np.zeros((self.grid_size, self.grid_size, 4), dtype=np.float32)
-        
+
         hazard_channel = np.clip(self.hazard_map, 0, 1)
         hazard_channel[self.hazard_map < 0] = 0.0
-        
+
         confidence_channel = np.clip(self.confidence_map, 0, 1)
         confidence_channel[self.confidence_map < 0] = 0.0
-        
+
         obs[:, :, 0] = hazard_channel
         obs[:, :, 1] = confidence_channel
-        
-        obs[self.uav_position[0], self.uav_position[1], 2] = 1.0
-        obs[self.goal_position[0], self.goal_position[1], 3] = 1.0
-        
-        return obs.astype(np.float32)
+
+        if not hasattr(self, '_coord_grid'):
+            rows = np.arange(self.grid_size, dtype=np.float32)
+            self._coord_grid = np.stack(np.meshgrid(rows, rows, indexing='ij'))
+
+        dy = self._coord_grid[0] - self.uav_position[0]
+        dx = self._coord_grid[1] - self.uav_position[1]
+        uav_dist = np.sqrt(dy * dy + dx * dx)
+        obs[:, :, 2] = 1.0 - np.clip(uav_dist / self._max_distance, 0, 1)
+
+        dy_g = self._coord_grid[0] - self.goal_position[0]
+        dx_g = self._coord_grid[1] - self.goal_position[1]
+        goal_dist = np.sqrt(dy_g * dy_g + dx_g * dx_g)
+        obs[:, :, 3] = 1.0 - np.clip(goal_dist / self._max_distance, 0, 1)
+
+        return obs
     
     def _classify_current_area(self):
         x, y = self.uav_position
@@ -255,41 +291,40 @@ class UAVNavigationEnv(gym.Env):
             'gt_hazard_level': float(self.gt_hazard_map[self.uav_position[0], self.uav_position[1]]),
             'in_danger_zone': in_danger,
             'steps': self.current_step,
-            'path_history': self.path_history.copy()
         }
+        if not self.lightweight_info:
+            info['path_history'] = self.path_history.copy()
         
         return self._get_observation(), reward, done, info
     
     def _calculate_reward(self) -> float:
-        R_GOAL = 1000.0
-        R_STEP = -0.1
-        R_PROGRESS = 1.0
-        R_REGRESS = -1.0
-        R_HAZARD_MAX = -50.0
-        R_COLLISION = -1000.0
-        
+        R_GOAL = 100.0
+        R_STEP = -0.2
+        R_PROGRESS_SCALE = 5.0
+        R_HAZARD_MAX = -10.0
+        R_COLLISION = -100.0
+
         goal_distance = np.linalg.norm(self.uav_position - self.goal_position)
-        
+
         if np.array_equal(self.uav_position, self.goal_position):
             self.previous_distance = None
             return R_GOAL
-        
+
         progress_reward = 0.0
         if self.previous_distance is not None:
             distance_change = self.previous_distance - goal_distance
-            if distance_change > 0:
-                progress_reward = R_PROGRESS
-            elif distance_change < 0:
-                progress_reward = R_REGRESS
-        
+            progress_reward = R_PROGRESS_SCALE * distance_change
+
         self.previous_distance = goal_distance
-        
+
+        proximity_bonus = max(0.0, 1.0 - goal_distance / self._max_distance) * 0.5
+
         hazard_level = max(0.0, self.hazard_map[self.uav_position[0], self.uav_position[1]])
         hazard_penalty = R_HAZARD_MAX * hazard_level
-        
+
         collision_penalty = R_COLLISION if hazard_level > self.termination_threshold else 0.0
-        
-        return progress_reward + R_STEP + hazard_penalty + collision_penalty
+
+        return progress_reward + R_STEP + proximity_bonus + hazard_penalty + collision_penalty
     
     def _check_terminal_conditions(self) -> bool:
         if np.array_equal(self.uav_position, self.goal_position):

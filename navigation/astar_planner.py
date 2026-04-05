@@ -43,9 +43,13 @@ class AStarPlanner:
 
         came_from = {}
         g_score = {start_t: 0.0}
+        closed = set()
 
         while open_heap:
             _, current = heapq.heappop(open_heap)
+            if current in closed:
+                continue
+            closed.add(current)
             if current == goal_t:
                 path = [current]
                 while current in came_from:
@@ -56,7 +60,8 @@ class AStarPlanner:
 
             cx, cy = current
             for nx, ny in self._neighbors(cx, cy):
-                step_cost = 1.0 + 50.0 * float(hazard_map[nx, ny])
+                raw = float(hazard_map[nx, ny])
+                step_cost = 1.0 + 50.0 * max(0.0, raw)
                 tentative_g = g_score[current] + step_cost
 
                 neighbor = (nx, ny)

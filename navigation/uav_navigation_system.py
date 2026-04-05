@@ -18,8 +18,9 @@ class UAVNavigationSystem:
         self.agent = PPONavigationAgent(
             input_shape=self.env.observation_space.shape,
             action_dim=self.env.action_space.n,
-            learning_rate=1e-4,
-            gamma=0.99
+            learning_rate=3e-4,
+            gamma=0.99,
+            entropy_coeff=0.05,
         )
         
         self.training_metrics = {
@@ -115,11 +116,11 @@ class UAVNavigationSystem:
             
             self.training_metrics['episode_rewards'].append(episode_reward)
             self.training_metrics['episode_lengths'].append(episode_steps)
-            
-            success = episode_reward > 100
+
+            success = bool(np.array_equal(info['uav_position'], info['goal_position']))
             self.training_metrics['success_episodes'].append(success)
-            
-            goal_distance = np.linalg.norm(info['uav_position'] - info['goal_position'])
+
+            goal_distance = float(np.linalg.norm(info['uav_position'] - info['goal_position']))
             efficiency = 1.0 / (1.0 + goal_distance + episode_steps * 0.01)
             self.training_metrics['navigation_efficiency'].append(efficiency)
             self._append_training_episode_csv(
@@ -130,26 +131,30 @@ class UAVNavigationSystem:
                 navigation_efficiency=efficiency,
                 goal_distance=goal_distance,
             )
-            
+
             if (episode_count + 1) % update_frequency == 0:
                 loss_info = self.agent.update_policy()
                 self.training_metrics['policy_losses'].append(loss_info['total_loss'])
-            
+
             if (episode_count + 1) % log_frequency == 0:
                 recent_rewards = self.training_metrics['episode_rewards'][-log_frequency:]
                 recent_successes = self.training_metrics['success_episodes'][-log_frequency:]
+                recent_distances = [
+                    float(np.linalg.norm(np.array([2, 2]) - np.array([self.env.grid_size - 3, self.env.grid_size - 3])))
+                ] if len(self.training_metrics['navigation_efficiency']) < log_frequency else []
                 recent_efficiency = self.training_metrics['navigation_efficiency'][-log_frequency:]
-                
+
                 avg_reward = np.mean(recent_rewards)
                 success_rate = np.mean(recent_successes)
                 avg_efficiency = np.mean(recent_efficiency)
-                
+
                 print(f"Episode {episode_count + 1}/{total_episodes}")
-                print(f"Avg Reward: {avg_reward:.2f} | Success Rate: {success_rate:.2%} | Efficiency: {avg_efficiency:.3f}")
-                
+                print(f"  Avg Reward: {avg_reward:.2f} | Goal-Reach Rate: {success_rate:.2%} | Efficiency: {avg_efficiency:.3f} | Last dist: {goal_distance:.1f}")
+
                 if success_rate > best_success_rate:
                     best_success_rate = success_rate
                     self.save_best_model()
+                    print(f"  >> New best model saved (goal-reach rate {success_rate:.2%})")
             
             if (episode_count + 1) % save_frequency == 0:
                 self.save_checkpoint(episode_count + 1)

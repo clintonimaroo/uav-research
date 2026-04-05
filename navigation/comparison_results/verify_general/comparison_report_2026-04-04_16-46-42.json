@@ -1,0 +1,42 @@
+{
+  "comparison_date": "2026-04-04T16:46:42.298199",
+  "episodes_per_method": 20,
+  "methods": {
+    "A*": {
+      "success_rate": 0.0,
+      "successes": 0,
+      "avg_steps": 126.0,
+      "std_steps": 0.0,
+      "avg_path_len": 163.27922061357862,
+      "avg_final_dist": 12.806248474865697,
+      "avg_hazard_encounters": 0.0,
+      "avg_total_reward": 127.39815263829436,
+      "std_reward": 2.842170943040401e-14,
+      "avg_hazard_penalty": 0.0,
+      "elapsed_time_seconds": 380.9237220287323
+    },
+    "PPO": {
+      "success_rate": 0.0,
+      "successes": 0,
+      "avg_steps": 10.0,
+      "std_steps": 0.0,
+      "avg_path_len": 14.142135623730955,
+      "avg_final_dist": 49.497474683058314,
+      "avg_hazard_encounters": 0.0,
+      "avg_total_reward": -45.81978731195737,
+      "std_reward": 7.105427357601002e-15,
+      "avg_hazard_penalty": 0.0,
+      "elapsed_time_seconds": 96.47385716438293
+    }
+  },
+  "comparison": {
+    "success_rate_improvement_pct": 0.0,
+    "steps_improvement_pct": 92.06349206349206,
+    "reward_improvement_pct": -135.96581768500815,
+    "hazard_encounters_improvement_pct": 0.0,
+    "better_success_rate": "A*",
+    "fewer_steps": "PPO",
+    "higher_reward": "A*",
+    "fewer_hazard_encounters": "A*"
+  }
+}

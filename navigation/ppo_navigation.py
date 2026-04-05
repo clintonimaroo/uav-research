@@ -52,12 +52,14 @@ class NavigationNetwork(nn.Module):
 class PPONavigationAgent:
     def __init__(self, input_shape: Tuple[int, int, int], action_dim: int,
                  learning_rate: float = 2e-4, gamma: float = 0.99,
-                 epsilon_clip: float = 0.2, update_epochs: int = 10):
+                 epsilon_clip: float = 0.2, update_epochs: int = 10,
+                 entropy_coeff: float = 0.01):
         
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.gamma = gamma
         self.epsilon_clip = epsilon_clip
         self.update_epochs = update_epochs
+        self.entropy_coeff = entropy_coeff
         
         self.policy_net = NavigationNetwork(input_shape, action_dim).to(self.device)
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=learning_rate)
@@ -138,7 +140,7 @@ class PPONavigationAgent:
             
             value_loss = F.mse_loss(values.squeeze(), rewards)
             
-            total_loss = policy_loss + 0.5 * value_loss - 0.01 * entropy
+            total_loss = policy_loss + 0.5 * value_loss - self.entropy_coeff * entropy
             
             self.optimizer.zero_grad()
             total_loss.backward()

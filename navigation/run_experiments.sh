@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export PYTHONUNBUFFERED=1
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+
 EPISODES="${1:-50}"
 COMPARISON_ROOT="comparison_results"
 BASE_GRID=50
@@ -10,6 +17,7 @@ BASE_NOISE=0.0
 BASE_REPLAN=0
 BASE_CONFIDENCE_DECAY=0.95
 BASE_OBSERVATION_RADIUS=2
+COMPARE_EXTRA=(--low_memory --no-cache)
 
 source ../venv/bin/activate
 
@@ -33,7 +41,8 @@ python compare_methods.py \
     --replan_frequency "${BASE_REPLAN}" \
     --confidence_decay "${BASE_CONFIDENCE_DECAY}" \
     --observation_radius "${BASE_OBSERVATION_RADIUS}" \
-    --output_dir "${COMPARISON_ROOT}/baseline"
+    --output_dir "${COMPARISON_ROOT}/baseline" \
+    "${COMPARE_EXTRA[@]}"
 
 echo "---------------------------------------------------------"
 echo "TEST 1: Scaling Grid Sizes"
@@ -49,7 +58,8 @@ for grid in 40 50 60 70 85 100; do
         --replan_frequency "${BASE_REPLAN}" \
         --confidence_decay "${BASE_CONFIDENCE_DECAY}" \
         --observation_radius "${BASE_OBSERVATION_RADIUS}" \
-        --output_dir "${COMPARISON_ROOT}/grid/grid_${grid}"
+        --output_dir "${COMPARISON_ROOT}/grid/grid_${grid}" \
+        "${COMPARE_EXTRA[@]}"
 done
 
 echo "---------------------------------------------------------"
@@ -67,7 +77,8 @@ for enc in 0.10 0.15 0.20 0.25 0.30; do
         --replan_frequency "${BASE_REPLAN}" \
         --confidence_decay "${BASE_CONFIDENCE_DECAY}" \
         --observation_radius "${BASE_OBSERVATION_RADIUS}" \
-        --output_dir "${COMPARISON_ROOT}/encounter/enc_${enc_label}"
+        --output_dir "${COMPARISON_ROOT}/encounter/enc_${enc_label}" \
+        "${COMPARE_EXTRA[@]}"
 done
 
 echo "---------------------------------------------------------"
@@ -85,7 +96,8 @@ for term in 0.70 0.80 0.85 0.90 0.95; do
         --replan_frequency "${BASE_REPLAN}" \
         --confidence_decay "${BASE_CONFIDENCE_DECAY}" \
         --observation_radius "${BASE_OBSERVATION_RADIUS}" \
-        --output_dir "${COMPARISON_ROOT}/termination/term_${term_label}"
+        --output_dir "${COMPARISON_ROOT}/termination/term_${term_label}" \
+        "${COMPARE_EXTRA[@]}"
 done
 
 echo "---------------------------------------------------------"
@@ -103,7 +115,8 @@ for noise in 0.00 0.05 0.10 0.15 0.20; do
         --replan_frequency "${BASE_REPLAN}" \
         --confidence_decay "${BASE_CONFIDENCE_DECAY}" \
         --observation_radius "${BASE_OBSERVATION_RADIUS}" \
-        --output_dir "${COMPARISON_ROOT}/noise/noise_${noise_label}"
+        --output_dir "${COMPARISON_ROOT}/noise/noise_${noise_label}" \
+        "${COMPARE_EXTRA[@]}"
 done
 
 echo "---------------------------------------------------------"
@@ -120,7 +133,8 @@ for replan in 0 1 2 4 8; do
         --replan_frequency "${replan}" \
         --confidence_decay "${BASE_CONFIDENCE_DECAY}" \
         --observation_radius "${BASE_OBSERVATION_RADIUS}" \
-        --output_dir "${COMPARISON_ROOT}/replan/replan_${replan}"
+        --output_dir "${COMPARISON_ROOT}/replan/replan_${replan}" \
+        "${COMPARE_EXTRA[@]}"
 done
 
 echo "---------------------------------------------------------"
@@ -138,7 +152,8 @@ for decay in 0.80 0.90 0.95 0.98 0.99; do
         --replan_frequency "${BASE_REPLAN}" \
         --confidence_decay "${decay}" \
         --observation_radius "${BASE_OBSERVATION_RADIUS}" \
-        --output_dir "${COMPARISON_ROOT}/confidence_decay/decay_${decay_label}"
+        --output_dir "${COMPARISON_ROOT}/confidence_decay/decay_${decay_label}" \
+        "${COMPARE_EXTRA[@]}"
 done
 
 echo "---------------------------------------------------------"
@@ -155,7 +170,8 @@ for radius in 1 2 3 4; do
         --replan_frequency "${BASE_REPLAN}" \
         --confidence_decay "${BASE_CONFIDENCE_DECAY}" \
         --observation_radius "${radius}" \
-        --output_dir "${COMPARISON_ROOT}/observation_radius/radius_${radius}"
+        --output_dir "${COMPARISON_ROOT}/observation_radius/radius_${radius}" \
+        "${COMPARE_EXTRA[@]}"
 done
 
 echo "---------------------------------------------------------"
