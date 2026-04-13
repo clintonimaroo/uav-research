@@ -50,6 +50,7 @@ class UAVNavigationSystem:
             "timestamp_utc",
         ]
         self._initialize_training_csv()
+        self._episode_plot_offset = 0
 
     def _initialize_training_csv(self):
         with open(self.training_csv_path, "w", newline="") as csv_file:
@@ -84,12 +85,23 @@ class UAVNavigationSystem:
     def train_navigation_system(self, total_episodes: int = 2000, 
                                update_frequency: int = 32, 
                                save_frequency: int = 200,
-                               log_frequency: int = 100):
+                               log_frequency: int = 100,
+                               episode_offset: int = 0,
+                               resume_checkpoint: str = None):
+        
+        self._episode_plot_offset = episode_offset
+        if resume_checkpoint and os.path.isfile(resume_checkpoint):
+            if self.agent.load_model(resume_checkpoint):
+                print(f"Loaded weights from {resume_checkpoint}")
+            else:
+                print(f"Warning: could not load {resume_checkpoint}, training from scratch")
+
+        target_global = episode_offset + total_episodes
         
         print(f"Training UAV Navigation System")
         print(f"Environment: {self.env.grid_size}x{self.env.grid_size} grid")
         print(f"Classifier: {self.env.config.model_name}")
-        print(f"Target Episodes: {total_episodes}")
+        print(f"Episodes this run: {total_episodes} (global episode {episode_offset + 1} .. {target_global})")
         print("-" * 60)
         
         episode_count = 0
@@ -123,8 +135,9 @@ class UAVNavigationSystem:
             goal_distance = float(np.linalg.norm(info['uav_position'] - info['goal_position']))
             efficiency = 1.0 / (1.0 + goal_distance + episode_steps * 0.01)
             self.training_metrics['navigation_efficiency'].append(efficiency)
+            global_episode = episode_offset + episode_count + 1
             self._append_training_episode_csv(
-                episode=episode_count + 1,
+                episode=global_episode,
                 reward=episode_reward,
                 steps=episode_steps,
                 success=success,
@@ -148,7 +161,7 @@ class UAVNavigationSystem:
                 success_rate = np.mean(recent_successes)
                 avg_efficiency = np.mean(recent_efficiency)
 
-                print(f"Episode {episode_count + 1}/{total_episodes}")
+                print(f"Episode {global_episode}/{target_global}")
                 print(f"  Avg Reward: {avg_reward:.2f} | Goal-Reach Rate: {success_rate:.2%} | Efficiency: {avg_efficiency:.3f} | Last dist: {goal_distance:.1f}")
 
                 if success_rate > best_success_rate:
@@ -156,18 +169,21 @@ class UAVNavigationSystem:
                     self.save_best_model()
                     print(f"  >> New best model saved (goal-reach rate {success_rate:.2%})")
             
-            if (episode_count + 1) % save_frequency == 0:
-                self.save_checkpoint(episode_count + 1)
+            if global_episode % save_frequency == 0:
+                self.save_checkpoint(global_episode)
                 self.plot_training_metrics()
                 
                 if success:
-                    self.demonstrate_navigation(episode_count + 1, save_visualization=True)
+                    self.demonstrate_navigation(global_episode, save_visualization=True)
             
             episode_count += 1
         
         print(f"\nTraining completed. Best success rate: {best_success_rate:.2%}")
         print(f"Per-episode training CSV saved to: {self.training_csv_path}")
-        self.generate_final_report()
+        self.generate_final_report(
+            cumulative_episodes=episode_offset + len(self.training_metrics['episode_rewards']),
+            episodes_this_run=len(self.training_metrics['episode_rewards']),
+        )
     
     def demonstrate_navigation(self, episode_id: int = None, save_visualization: bool = False,
                               real_time: bool = True):
@@ -323,7 +339,9 @@ class UAVNavigationSystem:
     def plot_training_metrics(self):
         fig, axes = plt.subplots(2, 2, figsize=(15, 10))
         
-        episodes = range(1, len(self.training_metrics['episode_rewards']) + 1)
+        start = self._episode_plot_offset + 1
+        end = self._episode_plot_offset + len(self.training_metrics['episode_rewards']) + 1
+        episodes = range(start, end)
         
         axes[0, 0].plot(episodes, self.training_metrics['episode_rewards'])
         axes[0, 0].set_title('Episode Rewards')
@@ -331,13 +349,13 @@ class UAVNavigationSystem:
         axes[0, 0].set_ylabel('Reward')
         axes[0, 0].grid(True)
         
-        if len(self.training_metrics['success_episodes']) >= 100:
+        n = len(self.training_metrics['success_episodes'])
+        if n >= 100:
             success_rate = []
-            for i in range(99, len(self.training_metrics['success_episodes'])):
+            for i in range(99, n):
                 rate = np.mean(self.training_metrics['success_episodes'][i-99:i+1])
                 success_rate.append(rate)
-            
-            axes[0, 1].plot(range(100, len(episodes) + 1), success_rate)
+            axes[0, 1].plot(range(start + 99, start + n), success_rate)
             axes[0, 1].set_title('Success Rate (100-episode window)')
             axes[0, 1].set_xlabel('Episode')
             axes[0, 1].set_ylabel('Success Rate')
@@ -359,7 +377,7 @@ class UAVNavigationSystem:
         plt.savefig('navigation_training_progress.png', dpi=300, bbox_inches='tight')
         plt.close()
     
-    def generate_final_report(self):
+    def generate_final_report(self, cumulative_episodes: int = None, episodes_this_run: int = None):
         total_episodes = len(self.training_metrics['episode_rewards'])
         final_success_rate = np.mean(self.training_metrics['success_episodes'][-100:]) if total_episodes >= 100 else np.mean(self.training_metrics['success_episodes'])
         avg_reward = np.mean(self.training_metrics['episode_rewards'][-100:]) if total_episodes >= 100 else np.mean(self.training_metrics['episode_rewards'])
@@ -367,7 +385,8 @@ class UAVNavigationSystem:
         
         report = {
             'training_completed': datetime.now().isoformat(),
-            'total_episodes': total_episodes,
+            'total_episodes': int(cumulative_episodes if cumulative_episodes is not None else total_episodes),
+            'episodes_this_run': int(episodes_this_run if episodes_this_run is not None else total_episodes),
             'final_success_rate': float(final_success_rate),
             'average_reward': float(avg_reward),
             'navigation_efficiency': float(avg_efficiency),
@@ -380,25 +399,48 @@ class UAVNavigationSystem:
             json.dump(report, f, indent=2)
         
         print(f"\nFinal Training Report:")
+        print(f"Cumulative episodes (report): {report['total_episodes']}")
         print(f"Success Rate: {final_success_rate:.2%}")
         print(f"Average Reward: {avg_reward:.2f}")
         print(f"Navigation Efficiency: {avg_efficiency:.3f}")
 
 def main():
-    navigation_system = UAVNavigationSystem(grid_size=50, max_episode_steps=200)
+    import argparse
+    parser = argparse.ArgumentParser(description="Train PPO UAV navigation")
+    parser.add_argument("--episodes", type=int, default=2000, help="Episodes to run this session")
+    parser.add_argument("--episode-offset", type=int, default=0, help="Global episode index before this run (for resume)")
+    parser.add_argument("--resume", type=str, default="", help="Path to .pth to load (e.g. navigation_models/best_navigation_model.pth)")
+    parser.add_argument("--no-cache", action="store_true", help="New scene each episode (generalization training)")
+    parser.add_argument("--grid", type=int, default=50)
+    parser.add_argument("--max-steps", type=int, default=200)
+    parser.add_argument("--update-freq", type=int, default=32)
+    parser.add_argument("--save-freq", type=int, default=200)
+    parser.add_argument("--log-freq", type=int, default=100)
+    parser.add_argument("--demo", action="store_true", help="After training, run real-time demo")
+    args = parser.parse_args()
+
+    navigation_system = UAVNavigationSystem(
+        grid_size=args.grid,
+        max_episode_steps=args.max_steps,
+        cache_imagery=not args.no_cache,
+    )
     
     print("Initializing UAV Navigation System with Disaster Detection")
     print("Training autonomous navigation agent...")
     
+    resume_path = args.resume.strip() or None
     navigation_system.train_navigation_system(
-        total_episodes=2000,
-        update_frequency=32,
-        save_frequency=200,
-        log_frequency=50
+        total_episodes=args.episodes,
+        update_frequency=args.update_freq,
+        save_frequency=args.save_freq,
+        log_frequency=args.log_freq,
+        episode_offset=args.episode_offset,
+        resume_checkpoint=resume_path,
     )
     
-    print("\nDemonstrating trained navigation system...")
-    navigation_system.demonstrate_navigation(real_time=True, save_visualization=True)
+    if args.demo:
+        print("\nDemonstrating trained navigation system...")
+        navigation_system.demonstrate_navigation(real_time=True, save_visualization=True)
 
 if __name__ == "__main__":
     main()

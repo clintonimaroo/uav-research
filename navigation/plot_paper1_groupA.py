@@ -5,6 +5,9 @@ import os
 from collections import defaultdict
 from typing import Dict, List, Tuple
 
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -417,6 +420,52 @@ def _plot_sweep_lines(summary_rows: List[Dict], output_dir: str):
     )
 
 
+def generate_all_figures(
+    comparison_root: str,
+    output_dir: str,
+    training_csv: str = "",
+    rolling_window: int = 100,
+    exclude_verify_runs: bool = True,
+) -> Tuple[str, str]:
+    """
+    Regenerate all Paper 1 Group A-style figures from saved comparison CSVs
+    and optional PPO training episode metrics.
+
+    Returns (output_dir, training_csv_path_used).
+    """
+    os.makedirs(output_dir, exist_ok=True)
+
+    training_csv_used = _find_latest_training_csv(training_csv)
+    _plot_training_group_a(training_csv_used, output_dir, rolling_window)
+
+    summary_files = glob.glob(os.path.join(comparison_root, "**", "run_summary.csv"), recursive=True)
+    if exclude_verify_runs:
+        summary_files = [p for p in summary_files if f"{os.sep}verify_" not in p]
+    if not summary_files:
+        raise ValueError(f"No run_summary.csv files found under: {comparison_root}")
+
+    summary_rows: List[Dict] = []
+    for csv_path in summary_files:
+        summary_rows.extend(_load_csv(csv_path))
+
+    baseline_csv = os.path.join(comparison_root, "baseline", "run_summary.csv")
+    if os.path.isfile(baseline_csv):
+        bar_rows = _load_csv(baseline_csv)
+    else:
+        bar_rows = _latest_run_rows(summary_rows)
+
+    _plot_method_bars(bar_rows, output_dir)
+    _plot_sweep_lines(summary_rows, output_dir)
+
+    print(f"Saved Group A/B plots to: {output_dir}")
+    if training_csv_used:
+        print(f"Training CSV used: {training_csv_used}")
+    else:
+        print("Training CSV was not found; training line plots were skipped.")
+
+    return output_dir, training_csv_used
+
+
 def main():
     parser = argparse.ArgumentParser(description="Generate Paper 1 Group A/B plots from CSV files")
     parser.add_argument(
@@ -443,29 +492,20 @@ def main():
         default=100,
         help="Rolling window for success-rate training plot",
     )
+    parser.add_argument(
+        "--include-verify-runs",
+        action="store_true",
+        help="Include comparison_results/verify_* folders in sweep curves (default: exclude)",
+    )
     args = parser.parse_args()
 
-    os.makedirs(args.output_dir, exist_ok=True)
-
-    training_csv = _find_latest_training_csv(args.training_csv)
-    _plot_training_group_a(training_csv, args.output_dir, args.rolling_window)
-
-    summary_files = glob.glob(os.path.join(args.comparison_root, "**", "run_summary.csv"), recursive=True)
-    if not summary_files:
-        raise ValueError(f"No run_summary.csv files found under: {args.comparison_root}")
-
-    summary_rows = []
-    for csv_path in summary_files:
-        summary_rows.extend(_load_csv(csv_path))
-
-    _plot_method_bars(summary_rows, args.output_dir)
-    _plot_sweep_lines(summary_rows, args.output_dir)
-
-    print(f"Saved Group A/B plots to: {args.output_dir}")
-    if training_csv:
-        print(f"Training CSV used: {training_csv}")
-    else:
-        print("Training CSV was not found; training line plots were skipped.")
+    generate_all_figures(
+        comparison_root=args.comparison_root,
+        output_dir=args.output_dir,
+        training_csv=args.training_csv,
+        rolling_window=args.rolling_window,
+        exclude_verify_runs=not args.include_verify_runs,
+    )
 
 
 if __name__ == "__main__":

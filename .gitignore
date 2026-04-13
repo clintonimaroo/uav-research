@@ -4,3 +4,4 @@ demo_outputs/
 .venv/
 venv/
 conference_101719.tex
+navigation/*.log
