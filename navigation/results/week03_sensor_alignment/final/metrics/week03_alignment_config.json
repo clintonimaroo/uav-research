@@ -1,0 +1,30 @@
+{
+  "generated_at": "2026-05-21T13:41:22",
+  "week1_stereo_results": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/results/week01_stereo_depth/final",
+  "week2_monocular_results": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/results/week02_monocular_depth/final",
+  "scenarios_path": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/scenarios.json",
+  "frames": [
+    "0010",
+    "0020",
+    "0030",
+    "0040",
+    "0050",
+    "0060",
+    "0070",
+    "0080",
+    "0090",
+    "0100",
+    "0110",
+    "0120",
+    "0130",
+    "0140",
+    "0150"
+  ],
+  "config": {
+    "grid_size": 50,
+    "collision_threshold_m": 2.5,
+    "risk_threshold": 0.5,
+    "max_frames": 15
+  },
+  "output_dir": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/results/week03_sensor_alignment/final"
+}

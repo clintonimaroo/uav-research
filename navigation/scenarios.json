@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "created_for": "paper2_week3_sensor_alignment",
+  "grid_size": 50,
+  "collision_threshold_m": 2.5,
+  "scenarios": [
+    {
+      "id": "baseline_open",
+      "name": "Baseline Open",
+      "frame_id": "0020",
+      "grid_size": 50,
+      "start_cell": [
+        2,
+        2
+      ],
+      "goal_cell": [
+        47,
+        47
+      ],
+      "stereo_risk_map": "navigation/results/week01_stereo_depth/final/arrays/frame_0020_stereo_risk.npy",
+      "mono_risk_map": "navigation/results/week02_monocular_depth/final/arrays/frame_0020_mono_risk.npy",
+      "stereo_obstacle_map": "navigation/results/week01_stereo_depth/final/arrays/frame_0020_obstacle_mask.npy",
+      "mono_obstacle_map": "navigation/results/week02_monocular_depth/final/arrays/frame_0020_obstacle_mask.npy",
+      "collision_threshold_m": 2.5,
+      "notes": "Lowest stereo obstacle fraction among the locked frame set."
+    },
+    {
+      "id": "dense_corridor",
+      "name": "Dense Corridor",
+      "frame_id": "0050",
+      "grid_size": 50,
+      "start_cell": [
+        5,
+        5
+      ],
+      "goal_cell": [
+        45,
+        45
+      ],
+      "stereo_risk_map": "navigation/results/week01_stereo_depth/final/arrays/frame_0050_stereo_risk.npy",
+      "mono_risk_map": "navigation/results/week02_monocular_depth/final/arrays/frame_0050_mono_risk.npy",
+      "stereo_obstacle_map": "navigation/results/week01_stereo_depth/final/arrays/frame_0050_obstacle_mask.npy",
+      "mono_obstacle_map": "navigation/results/week02_monocular_depth/final/arrays/frame_0050_obstacle_mask.npy",
+      "collision_threshold_m": 2.5,
+      "notes": "Highest stereo obstacle fraction among the locked frame set."
+    },
+    {
+      "id": "obstacle_cluster",
+      "name": "Obstacle Cluster",
+      "frame_id": "0060",
+      "grid_size": 50,
+      "start_cell": [
+        2,
+        47
+      ],
+      "goal_cell": [
+        47,
+        2
+      ],
+      "stereo_risk_map": "navigation/results/week01_stereo_depth/final/arrays/frame_0060_stereo_risk.npy",
+      "mono_risk_map": "navigation/results/week02_monocular_depth/final/arrays/frame_0060_mono_risk.npy",
+      "stereo_obstacle_map": "navigation/results/week01_stereo_depth/final/arrays/frame_0060_obstacle_mask.npy",
+      "mono_obstacle_map": "navigation/results/week02_monocular_depth/final/arrays/frame_0060_obstacle_mask.npy",
+      "collision_threshold_m": 2.5,
+      "notes": "Low mono-stereo obstacle agreement, useful for validation stress."
+    },
+    {
+      "id": "lateral_maneuver",
+      "name": "Lateral Maneuver",
+      "frame_id": "0010",
+      "grid_size": 50,
+      "start_cell": [
+        10,
+        5
+      ],
+      "goal_cell": [
+        40,
+        45
+      ],
+      "stereo_risk_map": "navigation/results/week01_stereo_depth/final/arrays/frame_0010_stereo_risk.npy",
+      "mono_risk_map": "navigation/results/week02_monocular_depth/final/arrays/frame_0010_mono_risk.npy",
+      "stereo_obstacle_map": "navigation/results/week01_stereo_depth/final/arrays/frame_0010_obstacle_mask.npy",
+      "mono_obstacle_map": "navigation/results/week02_monocular_depth/final/arrays/frame_0010_obstacle_mask.npy",
+      "collision_threshold_m": 2.5,
+      "notes": "Low mono-stereo risk correlation, useful for lateral planning checks."
+    },
+    {
+      "id": "stress_density",
+      "name": "Stress Density",
+      "frame_id": "0040",
+      "grid_size": 50,
+      "start_cell": [
+        5,
+        45
+      ],
+      "goal_cell": [
+        45,
+        5
+      ],
+      "stereo_risk_map": "navigation/results/week01_stereo_depth/final/arrays/frame_0040_stereo_risk.npy",
+      "mono_risk_map": "navigation/results/week02_monocular_depth/final/arrays/frame_0040_mono_risk.npy",
+      "stereo_obstacle_map": "navigation/results/week01_stereo_depth/final/arrays/frame_0040_obstacle_mask.npy",
+      "mono_obstacle_map": "navigation/results/week02_monocular_depth/final/arrays/frame_0040_obstacle_mask.npy",
+      "collision_threshold_m": 2.5,
+      "notes": "High mono-stereo risk RMSE, useful for worst-case comparison."
+    }
+  ]
+}
