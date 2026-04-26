@@ -1,0 +1,22 @@
+{
+  "generated_at": "2026-05-21T14:34:38",
+  "scenarios_path": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/scenarios.json",
+  "model_path": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/navigation_models/best_navigation_model.pth",
+  "input_shape": [
+    50,
+    50,
+    4
+  ],
+  "action_dim": 8,
+  "training_updates": 0,
+  "config": {
+    "grid_size": 50,
+    "max_steps": 200,
+    "collision_risk_threshold": 0.95,
+    "goal_threshold": 1.0,
+    "episodes": 50,
+    "start_goal_risk_threshold": 0.5,
+    "policy_risk_scale": 1.0
+  },
+  "output_dir": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/results/week04_navigation_integration/final"
+}

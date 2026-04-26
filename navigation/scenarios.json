@@ -14,15 +14,15 @@
         2
       ],
       "goal_cell": [
-        47,
-        47
+        38,
+        46
       ],
       "stereo_risk_map": "navigation/results/week01_stereo_depth/final/arrays/frame_0020_stereo_risk.npy",
       "mono_risk_map": "navigation/results/week02_monocular_depth/final/arrays/frame_0020_mono_risk.npy",
       "stereo_obstacle_map": "navigation/results/week01_stereo_depth/final/arrays/frame_0020_obstacle_mask.npy",
       "mono_obstacle_map": "navigation/results/week02_monocular_depth/final/arrays/frame_0020_obstacle_mask.npy",
       "collision_threshold_m": 2.5,
-      "notes": "Lowest stereo obstacle fraction among the locked frame set."
+      "notes": "Lowest stereo obstacle fraction among the locked frame set; start and goal are in shared low-risk mono-stereo cells."
     },
     {
       "id": "dense_corridor",
@@ -30,19 +30,19 @@
       "frame_id": "0050",
       "grid_size": 50,
       "start_cell": [
-        5,
-        5
+        9,
+        9
       ],
       "goal_cell": [
-        45,
-        45
+        47,
+        2
       ],
       "stereo_risk_map": "navigation/results/week01_stereo_depth/final/arrays/frame_0050_stereo_risk.npy",
       "mono_risk_map": "navigation/results/week02_monocular_depth/final/arrays/frame_0050_mono_risk.npy",
       "stereo_obstacle_map": "navigation/results/week01_stereo_depth/final/arrays/frame_0050_obstacle_mask.npy",
       "mono_obstacle_map": "navigation/results/week02_monocular_depth/final/arrays/frame_0050_obstacle_mask.npy",
       "collision_threshold_m": 2.5,
-      "notes": "Highest stereo obstacle fraction among the locked frame set."
+      "notes": "Highest stereo obstacle fraction among the locked frame set; start and goal are in shared low-risk mono-stereo cells."
     },
     {
       "id": "obstacle_cluster",
@@ -50,8 +50,8 @@
       "frame_id": "0060",
       "grid_size": 50,
       "start_cell": [
-        2,
-        47
+        9,
+        9
       ],
       "goal_cell": [
         47,
@@ -62,7 +62,7 @@
       "stereo_obstacle_map": "navigation/results/week01_stereo_depth/final/arrays/frame_0060_obstacle_mask.npy",
       "mono_obstacle_map": "navigation/results/week02_monocular_depth/final/arrays/frame_0060_obstacle_mask.npy",
       "collision_threshold_m": 2.5,
-      "notes": "Low mono-stereo obstacle agreement, useful for validation stress."
+      "notes": "Low mono-stereo obstacle agreement, useful for validation stress; start and goal are in shared low-risk mono-stereo cells."
     },
     {
       "id": "lateral_maneuver",
@@ -70,19 +70,19 @@
       "frame_id": "0010",
       "grid_size": 50,
       "start_cell": [
-        10,
-        5
+        2,
+        2
       ],
       "goal_cell": [
-        40,
-        45
+        46,
+        37
       ],
       "stereo_risk_map": "navigation/results/week01_stereo_depth/final/arrays/frame_0010_stereo_risk.npy",
       "mono_risk_map": "navigation/results/week02_monocular_depth/final/arrays/frame_0010_mono_risk.npy",
       "stereo_obstacle_map": "navigation/results/week01_stereo_depth/final/arrays/frame_0010_obstacle_mask.npy",
       "mono_obstacle_map": "navigation/results/week02_monocular_depth/final/arrays/frame_0010_obstacle_mask.npy",
       "collision_threshold_m": 2.5,
-      "notes": "Low mono-stereo risk correlation, useful for lateral planning checks."
+      "notes": "Low mono-stereo risk correlation, useful for lateral planning checks; start and goal are in shared low-risk mono-stereo cells."
     },
     {
       "id": "stress_density",
@@ -90,19 +90,19 @@
       "frame_id": "0040",
       "grid_size": 50,
       "start_cell": [
-        5,
-        45
+        2,
+        2
       ],
       "goal_cell": [
-        45,
-        5
+        29,
+        9
       ],
       "stereo_risk_map": "navigation/results/week01_stereo_depth/final/arrays/frame_0040_stereo_risk.npy",
       "mono_risk_map": "navigation/results/week02_monocular_depth/final/arrays/frame_0040_mono_risk.npy",
       "stereo_obstacle_map": "navigation/results/week01_stereo_depth/final/arrays/frame_0040_obstacle_mask.npy",
       "mono_obstacle_map": "navigation/results/week02_monocular_depth/final/arrays/frame_0040_obstacle_mask.npy",
       "collision_threshold_m": 2.5,
-      "notes": "High mono-stereo risk RMSE, useful for worst-case comparison."
+      "notes": "High mono-stereo risk RMSE, useful for worst-case comparison; start and goal are in shared low-risk mono-stereo cells."
     }
   ]
 }

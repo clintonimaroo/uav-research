@@ -1,0 +1,3 @@
+mode,runs,successes,success_rate,collisions,collision_rate,timeouts,timeout_rate,avg_steps,avg_final_distance,avg_path_length,avg_path_efficiency,avg_mean_path_risk,max_start_risk,max_goal_risk
+stereo,25,0,0.0,15,0.6,10,0.4,82.72,22.98451337796395,30.4613275223096,0.0,0.30379755660891533,0.49035486578941345,0.3078703284263611
+mono,25,0,0.0,15,0.6,10,0.4,100.64,25.533137746250333,51.7779624154111,0.0,0.025147695410996675,0.27681323885917664,0.4484953284263611
