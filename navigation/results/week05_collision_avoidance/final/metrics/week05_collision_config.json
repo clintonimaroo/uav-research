@@ -1,0 +1,36 @@
+{
+  "generated_at": "2026-05-21T15:07:44",
+  "scenarios_path": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/scenarios.json",
+  "model_path": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/navigation_models/best_navigation_model.pth",
+  "input_shape": [
+    50,
+    50,
+    4
+  ],
+  "action_dim": 8,
+  "training_updates": 0,
+  "controllers": [
+    "raw_ppo",
+    "ppo_shield"
+  ],
+  "config": {
+    "grid_size": 50,
+    "max_steps": 200,
+    "episodes": 50,
+    "collision_risk_threshold": 0.95,
+    "shield_caution_threshold": 0.5,
+    "hazard_threshold": 0.7,
+    "goal_threshold": 1.0,
+    "start_goal_risk_threshold": 0.5,
+    "policy_risk_scale": 1.0,
+    "lookahead_steps": 3,
+    "risk_penalty_weight": 20.0,
+    "progress_weight": 5.0,
+    "loop_penalty_weight": 3.0
+  },
+  "selected_visuals": [
+    "/Users/clintonimaro/Documents/Projects/uav-research/navigation/results/week05_collision_avoidance/final/visuals/week05_selected_stereo_shield_trajectory.png",
+    "/Users/clintonimaro/Documents/Projects/uav-research/navigation/results/week05_collision_avoidance/final/visuals/week05_selected_mono_shield_trajectory.png"
+  ],
+  "output_dir": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/results/week05_collision_avoidance/final"
+}

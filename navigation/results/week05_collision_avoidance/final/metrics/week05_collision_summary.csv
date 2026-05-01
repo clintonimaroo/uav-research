@@ -1,0 +1,5 @@
+controller,mode,runs,successes,success_rate,collisions,collision_rate,timeouts,timeout_rate,avg_steps,avg_final_distance,avg_path_length,avg_min_obstacle_margin,avg_hazard_exposure_steps,avg_joint_hazard_obstacle_steps,avg_shield_interventions,avg_shield_intervention_rate
+ppo_shield,mono,25,25,1.0,0,0.0,0,0.0,38.04,0.0,53.08423658539079,0.8261574225127696,0.04,0.0,13.4,0.3661131201317801
+ppo_shield,stereo,25,22,0.88,0,0.0,3,0.12,59.84,3.364806471176397,80.3187185237259,0.7314274811744689,0.04,0.0,37.36,0.5050992143647582
+raw_ppo,mono,25,0,0.0,15,0.6,10,0.4,100.64,25.533137746250333,51.7779624154111,0.284915177822113,0.32,0.0,0.0,0.0
+raw_ppo,stereo,25,0,0.0,15,0.6,10,0.4,82.72,22.98451337796395,30.4613275223096,0.03310963869094844,0.56,0.0,0.0,0.0
