@@ -111,12 +111,16 @@ def run_episode(
     episode_index: int,
     episode_variant: int,
     perception_latency_ms: float,
+    render_visual: bool | None = None,
+    visual_label: str | None = None,
+    physical_obstacle_risk: np.ndarray | None = None,
 ) -> tuple[dict[str, object], list[dict[str, object]], list[dict[str, object]], list[dict[str, object]], str]:
     start = np.array(scenario["start_cell"], dtype=np.int32)
     goal = np.array(scenario["goal_cell"], dtype=np.int32)
     position = start.copy()
     path = [position.copy()]
     combined_risk = np.maximum(obstacle_risk, hazard_risk)
+    collision_risk = obstacle_risk if physical_obstacle_risk is None else np.clip(physical_obstacle_risk, 0.0, 1.0).astype(np.float32)
     policy_config = NavigationIntegrationConfig(
         grid_size=config.grid_size,
         max_steps=config.max_steps,
@@ -142,7 +146,7 @@ def run_episode(
         loop_penalty_weight=config.loop_penalty_weight,
     )
     input_risk = policy_risk(combined_risk, policy_config)
-    clearance = clearance_field(obstacle_risk, config.collision_risk_threshold)
+    clearance = clearance_field(collision_risk, config.collision_risk_threshold)
     start_distance = float(np.linalg.norm(goal - start))
     reason = "max_steps"
     success = False
@@ -183,7 +187,8 @@ def run_episode(
         position = candidate_position(position, selected_action, config.grid_size)
         recent_positions.append(tuple(position.tolist()))
         path.append(position.copy())
-        obstacle_value = float(obstacle_risk[int(position[0]), int(position[1])])
+        perceived_obstacle_value = float(obstacle_risk[int(position[0]), int(position[1])])
+        obstacle_value = float(collision_risk[int(position[0]), int(position[1])])
         hazard_value = float(hazard_risk[int(position[0]), int(position[1])])
         combined_value = float(combined_risk[int(position[0]), int(position[1])])
         clearance_cells = float(clearance[int(position[0]), int(position[1])])
@@ -217,6 +222,7 @@ def run_episode(
                 "shield_overrode": int(overridden),
                 "shield_reason": shield_reason,
                 "obstacle_risk": obstacle_value,
+                "perceived_obstacle_risk": perceived_obstacle_value,
                 "hazard_risk": hazard_value,
                 "combined_risk": combined_value,
                 "obstacle_clearance_cells": clearance_cells,
@@ -240,6 +246,7 @@ def run_episode(
                     "proposed_score": proposed_score,
                     "selected_score": selected_score,
                     "obstacle_risk": obstacle_value,
+                    "perceived_obstacle_risk": perceived_obstacle_value,
                     "hazard_risk": hazard_value,
                     "distance_to_goal": final_distance,
                     "shield_decision_latency_ms": shield_latency_ms,
@@ -251,14 +258,17 @@ def run_episode(
     elapsed_ms = (time.perf_counter() - start_time) * 1000.0
     length = path_length(path)
     final_distance = float(np.linalg.norm(goal - position))
-    path_obstacle_values = [float(obstacle_risk[int(p[0]), int(p[1])]) for p in path]
+    path_obstacle_values = [float(collision_risk[int(p[0]), int(p[1])]) for p in path]
+    path_perceived_obstacle_values = [float(obstacle_risk[int(p[0]), int(p[1])]) for p in path]
     path_hazard_values = [float(hazard_risk[int(p[0]), int(p[1])]) for p in path]
     path_clearance_values = [float(clearance[int(p[0]), int(p[1])]) for p in path]
     interventions = sum(int(row["shield_overrode"]) for row in step_rows)
     progress_efficiency = max(0.0, start_distance - final_distance) / max(length, 1e-6)
     selected_visual = ""
-    if should_render(controller, mode, str(scenario["id"]), episode_variant):
-        selected_visual = str(output_dir / "visuals" / f"week06_selected_{controller}_{mode}_trajectory.png")
+    visual_enabled = should_render(controller, mode, str(scenario["id"]), episode_variant) if render_visual is None else render_visual
+    if visual_enabled:
+        label = visual_label if visual_label else f"week06_selected_{controller}_{mode}_trajectory"
+        selected_visual = str(output_dir / "visuals" / f"{label}.png")
         render_trajectory(combined_risk, path, start, goal, Path(selected_visual))
     summary = {
         "episode": episode_index,
@@ -272,8 +282,10 @@ def run_episode(
         "start_col": int(start[1]),
         "goal_row": int(goal[0]),
         "goal_col": int(goal[1]),
-        "start_obstacle_risk": float(obstacle_risk[int(start[0]), int(start[1])]),
-        "goal_obstacle_risk": float(obstacle_risk[int(goal[0]), int(goal[1])]),
+        "start_obstacle_risk": float(collision_risk[int(start[0]), int(start[1])]),
+        "goal_obstacle_risk": float(collision_risk[int(goal[0]), int(goal[1])]),
+        "start_perceived_obstacle_risk": float(obstacle_risk[int(start[0]), int(start[1])]),
+        "goal_perceived_obstacle_risk": float(obstacle_risk[int(goal[0]), int(goal[1])]),
         "success": int(success),
         "collided": int(collided),
         "done_reason": reason,
@@ -286,6 +298,8 @@ def run_episode(
         "min_obstacle_distance_cells": safe_float(float(np.min(path_clearance_values))),
         "mean_obstacle_risk": safe_float(float(np.mean(path_obstacle_values))),
         "max_obstacle_risk": safe_float(float(np.max(path_obstacle_values))),
+        "mean_perceived_obstacle_risk": safe_float(float(np.mean(path_perceived_obstacle_values))),
+        "max_perceived_obstacle_risk": safe_float(float(np.max(path_perceived_obstacle_values))),
         "mean_hazard_risk": safe_float(float(np.mean(path_hazard_values))),
         "max_hazard_risk": safe_float(float(np.max(path_hazard_values))),
         "hazard_exposure_steps": sum(1 for value in path_hazard_values if value >= config.hazard_threshold),

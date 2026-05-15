@@ -1,3 +1,6 @@
 *.pth filter=lfs diff=lfs merge=lfs -text
 *.mp4 filter=lfs diff=lfs merge=lfs -text
 *.so filter=lfs diff=lfs merge=lfs -text
+navigation/results/week07_robustness/final/metrics/week07_step_results.csv filter=lfs diff=lfs merge=lfs -text
+navigation/results/week07_robustness/final/metrics/week07_interventions.csv filter=lfs diff=lfs merge=lfs -text
+navigation/results/week07_robustness/final/metrics/week07_events.csv filter=lfs diff=lfs merge=lfs -text
