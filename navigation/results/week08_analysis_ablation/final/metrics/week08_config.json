@@ -1,0 +1,50 @@
+{
+  "generated_at": "2026-05-29T05:15:30",
+  "scenarios_path": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/scenarios.json",
+  "model_path": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/navigation_models/best_navigation_model.pth",
+  "stereo_metrics_path": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/results/week01_stereo_depth/final/metrics/week01_stereo_metrics.csv",
+  "mono_metrics_path": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/results/week02_monocular_depth/final/metrics/week02_mono_metrics.csv",
+  "week6_dir": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/results/week06_performance_evaluation/final/metrics",
+  "week7_dir": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/results/week07_robustness/final/metrics",
+  "input_shape": [
+    50,
+    50,
+    4
+  ],
+  "action_dim": 8,
+  "training_updates": 0,
+  "hazard_levels": [
+    "none",
+    "low",
+    "moderate",
+    "high"
+  ],
+  "config": {
+    "grid_size": 50,
+    "max_steps": 200,
+    "episodes_per_mode_level": 250,
+    "collision_risk_threshold": 0.95,
+    "shield_caution_threshold": 0.5,
+    "hazard_threshold": 0.7,
+    "goal_threshold": 1.0,
+    "start_goal_risk_threshold": 0.5,
+    "policy_risk_scale": 1.0,
+    "lookahead_steps": 3,
+    "risk_penalty_weight": 20.0,
+    "progress_weight": 5.0,
+    "loop_penalty_weight": 3.0
+  },
+  "selected_visuals": [
+    "/Users/clintonimaro/Documents/Projects/uav-research/navigation/results/week08_analysis_ablation/final/visuals/week08_clean_success_rate.png",
+    "/Users/clintonimaro/Documents/Projects/uav-research/navigation/results/week08_analysis_ablation/final/visuals/week08_clean_collision_rate.png",
+    "/Users/clintonimaro/Documents/Projects/uav-research/navigation/results/week08_analysis_ablation/final/visuals/week08_hazard_density_success_rate.png",
+    "/Users/clintonimaro/Documents/Projects/uav-research/navigation/results/week08_analysis_ablation/final/visuals/week08_hazard_density_exposure.png",
+    "/Users/clintonimaro/Documents/Projects/uav-research/navigation/results/week08_analysis_ablation/final/visuals/week08_perception_degradation_success.png",
+    "/Users/clintonimaro/Documents/Projects/uav-research/navigation/results/week08_analysis_ablation/final/visuals/week08_latency_success_tradeoff.png",
+    "/Users/clintonimaro/Documents/Projects/uav-research/navigation/results/week08_analysis_ablation/final/visuals/week08_selected_stereo_none_hazard_density_trajectory.png",
+    "/Users/clintonimaro/Documents/Projects/uav-research/navigation/results/week08_analysis_ablation/final/visuals/week08_selected_mono_none_hazard_density_trajectory.png",
+    "/Users/clintonimaro/Documents/Projects/uav-research/navigation/results/week08_analysis_ablation/final/visuals/week08_selected_stereo_high_hazard_density_trajectory.png",
+    "/Users/clintonimaro/Documents/Projects/uav-research/navigation/results/week08_analysis_ablation/final/visuals/week08_selected_mono_high_hazard_density_trajectory.png"
+  ],
+  "output_dir": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/results/week08_analysis_ablation/final"
+}

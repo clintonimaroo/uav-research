@@ -1,0 +1,5 @@
+controller,mode,runs,success_rate,collision_rate,timeout_rate,avg_path_efficiency,avg_min_obstacle_distance_cells,avg_total_inference_latency_ms
+ppo_shield,mono,250,0.956,0.0,0.044,0.7600523268124411,1.336685791015625,40.84080250337608
+ppo_shield,stereo,250,0.808,0.0,0.192,0.6408890941831855,2.7979093017578127,12.255187650534305
+raw_ppo,mono,250,0.0,0.6,0.4,0.0,0.57599853515625,39.9850171345391
+raw_ppo,stereo,250,0.0,0.6,0.4,0.0,2.2713720703125,11.40244985756738

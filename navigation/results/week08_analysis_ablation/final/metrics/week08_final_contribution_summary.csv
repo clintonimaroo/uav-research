@@ -1,0 +1,5 @@
+finding,value,mono_success_rate,stereo_success_rate,mono_latency_ms,stereo_latency_ms,mono_success_gain,stereo_success_gain,mono_collision_reduction,stereo_collision_reduction,mono_worst_perturbation,mono_worst_success_drop,stereo_worst_perturbation,stereo_worst_success_drop,mono_high_hazard_success,stereo_high_hazard_success,mono_high_hazard_exposure_steps,stereo_high_hazard_exposure_steps
+clean_condition_safety,PPO+shield reached zero clean-condition collisions for both sensing modes,0.956,0.808,40.84080250337608,12.255187650534305,,,,,,,,,,,,
+controller_ablation,Raw PPO was unsafe while PPO+shield removed clean-condition collisions,,,,,0.956,0.808,0.6,0.6,,,,,,,,
+perception_degradation,Partial occlusion was the strongest stereo failure mode; monocular degraded most under resolution or blur,,,,,,,,,reduced_resolution,0.23199999999999998,partial_occlusion,0.404,,,,
+hazard_density,Hazard density increased exposure and shield workload while physical collision remained evaluated from obstacle risk,,,,,,,,,,,,,0.772,0.436,0.196,0.396

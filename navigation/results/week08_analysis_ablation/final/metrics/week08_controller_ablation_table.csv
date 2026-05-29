@@ -1,0 +1,3 @@
+mode,raw_success_rate,shield_success_rate,success_rate_gain,raw_collision_rate,shield_collision_rate,collision_rate_reduction,raw_path_efficiency,shield_path_efficiency
+mono,0.0,0.956,0.956,0.6,0.0,0.6,0.0,0.7600523268124411
+stereo,0.0,0.808,0.808,0.6,0.0,0.6,0.0,0.6408890941831855
