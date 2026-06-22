@@ -1,4 +1,5 @@
 import gym
+import json
 import numpy as np
 import torch
 from gym import spaces
@@ -26,7 +27,10 @@ class UAVNavigationEnv(gym.Env):
                  perception_noise_std: float = 0.0,
                  lightweight_info: bool = False,
                  aerial_cell_px: int = 20,
-                 quiet_scene: bool = False):
+                 quiet_scene: bool = False,
+                 scene_profile: str = "mixed",
+                 scene_seed: Optional[int] = None,
+                 fixed_map_path: Optional[str] = None):
         super(UAVNavigationEnv, self).__init__()
         
         self.grid_size = grid_size
@@ -40,9 +44,20 @@ class UAVNavigationEnv(gym.Env):
         self.termination_threshold = termination_threshold
         self.perception_noise_std = perception_noise_std
         self.lightweight_info = lightweight_info
+        self.scene_profile = scene_profile
+        self.scene_seed = scene_seed
+        self.fixed_map_path = fixed_map_path
+        self.fixed_map_metadata = None
+        self.fixed_aerial_image = None
+        self.fixed_disaster_locations = None
+        self.fixed_gt_hazard_map = None
+        self.fixed_classifier_hazard_map = None
+        self.fixed_confidence_map = None
         self.cached_aerial_image = None
+        self.cached_scene_seed = None
         self.observed_cells = set()
         self.last_update_step = {}
+        self.cell_classification_cache = {}
         self.previous_distance = None
         
         self.action_space = spaces.Discrete(8)
@@ -53,6 +68,8 @@ class UAVNavigationEnv(gym.Env):
         )
         
         self._load_disaster_classifier(classifier_path)
+        if self.fixed_map_path:
+            self._load_fixed_map_package(self.fixed_map_path)
         self.aerial_processor = AerialImageProcessor(
             classifier_path,
             shared_classifier=self.classifier,
@@ -62,9 +79,59 @@ class UAVNavigationEnv(gym.Env):
             shared_config=self.config,
         )
         self._initialize_environment()
+
+    def _load_fixed_map_package(self, fixed_map_path: str):
+        map_path = os.path.abspath(fixed_map_path)
+        if not os.path.exists(map_path):
+            raise FileNotFoundError(f"Fixed map package not found: {map_path}")
+
+        package = np.load(map_path, allow_pickle=False)
+        self.fixed_aerial_image = package["aerial_image"].astype(np.uint8)
+        self.fixed_gt_hazard_map = package["gt_hazard_map"].astype(np.float32)
+        self.fixed_classifier_hazard_map = package["classifier_hazard_map"].astype(np.float32)
+        self.fixed_confidence_map = package["confidence_map"].astype(np.float32)
+
+        disaster_json = package["disaster_locations_json"].item()
+        self.fixed_disaster_locations = json.loads(disaster_json)
+
+        metadata_path = os.path.splitext(map_path)[0] + ".json"
+        metadata = {}
+        if os.path.exists(metadata_path):
+            with open(metadata_path, "r") as handle:
+                metadata = json.load(handle)
+        metadata["map_package_path"] = map_path
+        metadata["metadata_path"] = metadata_path if os.path.exists(metadata_path) else ""
+        self.fixed_map_metadata = metadata
+
+        expected = (self.grid_size, self.grid_size)
+        for name, array in [
+            ("gt_hazard_map", self.fixed_gt_hazard_map),
+            ("classifier_hazard_map", self.fixed_classifier_hazard_map),
+            ("confidence_map", self.fixed_confidence_map),
+        ]:
+            if array.shape != expected:
+                raise ValueError(
+                    f"Fixed map {name} has shape {array.shape}, expected {expected}"
+                )
+
+    def map_identity(self) -> Dict:
+        if self.fixed_map_metadata is not None:
+            return dict(self.fixed_map_metadata)
+        return {
+            "map_label": self.scene_profile,
+            "scene_profile": self.scene_profile,
+            "scene_seed": self.scene_seed,
+            "map_package_path": "",
+            "map_source": "generated_at_runtime",
+        }
         
     def _load_disaster_classifier(self, model_path: str):
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        if torch.cuda.is_available():
+            self.device = torch.device('cuda')
+        elif torch.backends.mps.is_available():
+            self.device = torch.device('mps')
+        else:
+            self.device = torch.device('cpu')
         checkpoint = torch.load(model_path, map_location=self.device, weights_only=False)
         
         self.config = checkpoint['config']
@@ -103,6 +170,10 @@ class UAVNavigationEnv(gym.Env):
         self.path_history = [self.uav_position.copy()]
 
     def _compute_ground_truth_hazards(self):
+        if self.fixed_gt_hazard_map is not None:
+            self.gt_hazard_map = self.fixed_gt_hazard_map.copy()
+            return
+
         self.gt_hazard_map.fill(0.0)
         
         for disaster in self.disaster_locations:
@@ -123,22 +194,32 @@ class UAVNavigationEnv(gym.Env):
                             self.gt_hazard_map[nx, ny] = max(self.gt_hazard_map[nx, ny], hazard_val)
 
     def _generate_aerial_scene(self):
-        if self.cache_imagery and self.cached_aerial_image is not None:
-            # Reuse the same arrays (read-only during navigation). Avoids a full
-            # image copy on every reset, which was doubling RAM (~grid^2 * cell_px^2).
+        if self.fixed_aerial_image is not None:
+            self.aerial_image = self.fixed_aerial_image.copy()
+            self.disaster_locations = [dict(item) for item in self.fixed_disaster_locations]
+            self.cell_classification_cache = {}
+            if not self.quiet_scene:
+                label = self.fixed_map_metadata.get("map_label", "fixed map") if self.fixed_map_metadata else "fixed map"
+                print(f"Loaded fixed map package: {label}")
+            return
+
+        if self.cached_aerial_image is not None and self.cached_scene_seed == self.scene_seed:
             self.aerial_image = self.cached_aerial_image
             self.disaster_locations = self.cached_disaster_locations
             return
         
         if not self.quiet_scene:
             print("Generating aerial imagery...")
+        rng = np.random.default_rng(self.scene_seed)
         self.aerial_image, self.disaster_locations = self.aerial_processor.generate_aerial_scene(
-            self.grid_size, cell_px=self.aerial_cell_px
+            self.grid_size, cell_px=self.aerial_cell_px, scene_profile=self.scene_profile, rng=rng
         )
         
-        if self.cache_imagery:
+        self.cell_classification_cache = {}
+        if self.cache_imagery or self.scene_seed is not None:
             self.cached_aerial_image = self.aerial_image
             self.cached_disaster_locations = self.disaster_locations
+            self.cached_scene_seed = self.scene_seed
         
         if not self.quiet_scene:
             print(f"Generated aerial imagery: {len(self.disaster_locations)} disaster zones")
@@ -157,12 +238,27 @@ class UAVNavigationEnv(gym.Env):
                     cell_key = (nx, ny)
                     if cell_key not in self.observed_cells:
                         cells_to_classify.append((nx, ny))
+
+        if self.fixed_classifier_hazard_map is not None:
+            for i, j in cells_to_classify:
+                self.hazard_map[i, j] = float(self.fixed_classifier_hazard_map[i, j])
+                self.confidence_map[i, j] = float(self.fixed_confidence_map[i, j])
+                self.observed_cells.add((i, j))
+                self.last_update_step[(i, j)] = self.current_step
+            return
         
         if cells_to_classify:
             batch_images = []
             batch_coords = []
             
             for i, j in cells_to_classify:
+                cached = self.cell_classification_cache.get((i, j))
+                if cached is not None:
+                    self.hazard_map[i, j] = cached["hazard"]
+                    self.confidence_map[i, j] = cached["confidence"]
+                    self.observed_cells.add((i, j))
+                    self.last_update_step[(i, j)] = self.current_step
+                    continue
                 x_start = i * cell_size
                 x_end = (i + 1) * cell_size
                 y_start = j * cell_size
@@ -197,8 +293,13 @@ class UAVNavigationEnv(gym.Env):
                                 disaster_prob += prob
                         
                         overall_confidence = torch.max(probabilities[idx]).item()
-                        self.hazard_map[i, j] = min(disaster_prob, 1.0)
+                        hazard_value = min(disaster_prob, 1.0)
+                        self.hazard_map[i, j] = hazard_value
                         self.confidence_map[i, j] = overall_confidence
+                        self.cell_classification_cache[(i, j)] = {
+                            "hazard": hazard_value,
+                            "confidence": overall_confidence,
+                        }
                         self.observed_cells.add((i, j))
                         self.last_update_step[(i, j)] = self.current_step
                     del outputs, probabilities
@@ -336,7 +437,9 @@ class UAVNavigationEnv(gym.Env):
             return True
         return False
     
-    def reset(self) -> np.ndarray:
+    def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> np.ndarray:
+        if seed is not None and self.fixed_aerial_image is None:
+            self.scene_seed = int(seed)
         self.current_step = 0
         self.previous_distance = None
         self._initialize_environment()

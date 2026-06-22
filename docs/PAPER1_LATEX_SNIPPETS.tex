@@ -1,0 +1,82 @@
+\begin{table}[htbp]
+\caption{PPO vs. A* Across Representative Fire-Density Environments}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{Environment} & \textbf{Method} & \textbf{Success} & \textbf{Path Eff.} & \textbf{Hazards} \\
+\hline
+Light/Sparse Fire & A* & 1.000 & 0.980 & 0.000 \\
+Light/Sparse Fire & PPO & 0.640 & 0.640 & 0.040 \\
+\hline
+Moderate Fire & A* & 1.000 & 0.943 & 0.000 \\
+Moderate Fire & PPO & 0.380 & 0.380 & 0.100 \\
+\hline
+Dense/Heavy Fire & A* & 0.760 & 0.587 & 0.100 \\
+Dense/Heavy Fire & PPO & 0.080 & 0.080 & 0.120 \\
+\hline
+\end{tabular}
+\label{tab:fire_density_comparison}
+\end{center}
+\end{table}
+
+\begin{table}[htbp]
+\caption{PPO Training Summary from 3,000 Saved Episodes}
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Window} & \textbf{Success Rate} & \textbf{Avg. Reward} & \textbf{Avg. Efficiency} \\
+\hline
+Last 100 episodes & 0.270 & 238.920 & 0.187 \\
+Last 300 episodes & 0.293 & 217.002 & 0.180 \\
+Last 1000 episodes & 0.368 & 226.985 & 0.200 \\
+All 3000 episodes & 0.320 & 212.999 & 0.183 \\
+\hline
+\end{tabular}
+\label{tab:ppo_3000_training_summary}
+\end{center}
+\end{table}
+
+\begin{table}[htbp]
+\caption{Main Experimental Parameters}
+\begin{center}
+\begin{tabular}{|c|c|}
+\hline
+\textbf{Parameter} & \textbf{Value} \\
+\hline
+Grid size & $50 \times 50$ \\
+Maximum steps & 200 \\
+Episodes per environment/method & 50 \\
+Classifier checkpoint & checkpoint.pth \\
+PPO checkpoint & uav\_navigation\_3000.pth \\
+PPO input shape & $50 \times 50 \times 4$ \\
+Action space & 8 discrete movements \\
+Encounter threshold & 0.2 \\
+Termination threshold & 0.9 \\
+Perception noise & 0.0 \\
+Observation radius & 2 \\
+Confidence decay & 0.95 \\
+Smoothing window & 300 episodes \\
+Marker spacing & 200 episodes \\
+\hline
+\end{tabular}
+\label{tab:experiment_parameters}
+\end{center}
+\end{table}
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\linewidth]{figures/paper1_success_rate_fire_density_paper.pdf}}
+\caption{Success rate of A* and PPO across three controlled synthetic fire-density environments using the real CNN hazard classifier. Each condition contains 50 seeded evaluation episodes.}
+\label{fig:paper1_fire_density_success}
+\end{figure}
+
+\begin{figure*}[htbp]
+\centerline{\includegraphics[width=\textwidth]{figures/paper1_fire_density_success_vs_episode_comparison.pdf}}
+\caption{Episode-level success behavior across light, moderate, and dense synthetic fire-density environments. Faint traces show raw episode outcomes, while foreground curves show smoothed trends with distinct markers for A* and PPO.}
+\label{fig:paper1_success_episode_comparison}
+\end{figure*}
+
+\begin{figure*}[htbp]
+\centerline{\includegraphics[width=\textwidth]{figures/paper1_fire_density_reward_vs_episode_comparison.pdf}}
+\caption{Episode-level reward behavior across light, moderate, and dense synthetic fire-density environments. Faint traces show raw rewards, while foreground curves show smoothed trends with distinct markers for A* and PPO.}
+\label{fig:paper1_reward_episode_comparison}
+\end{figure*}

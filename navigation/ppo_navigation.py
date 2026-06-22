@@ -173,11 +173,22 @@ class PPONavigationAgent:
         rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
         return (rewards - rewards.mean()) / (rewards.std() + 1e-8)
     
+    def _to_cpu(self, value):
+        if torch.is_tensor(value):
+            return value.detach().cpu()
+        if isinstance(value, dict):
+            return {key: self._to_cpu(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [self._to_cpu(item) for item in value]
+        if isinstance(value, tuple):
+            return tuple(self._to_cpu(item) for item in value)
+        return value
+
     def save_model(self, filepath: str):
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         torch.save({
-            'policy_state_dict': self.policy_net.state_dict(),
-            'optimizer_state_dict': self.optimizer.state_dict(),
+            'policy_state_dict': self._to_cpu(self.policy_net.state_dict()),
+            'optimizer_state_dict': self._to_cpu(self.optimizer.state_dict()),
         }, filepath)
     
     def load_model(self, filepath: str):
@@ -188,6 +199,10 @@ class PPONavigationAgent:
         self.policy_net.load_state_dict(checkpoint['policy_state_dict'])
         self.old_policy_net.load_state_dict(checkpoint['policy_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        for state in self.optimizer.state.values():
+            for key, value in state.items():
+                if torch.is_tensor(value):
+                    state[key] = value.to(self.device)
         return True
 
 class ExperienceBuffer:

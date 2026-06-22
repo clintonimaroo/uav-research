@@ -1,0 +1,59 @@
+{
+  "status": "completed",
+  "updated_at": "2026-06-19T02:12:49.192667",
+  "training_run_id": "2026-06-18_20-24-57",
+  "training_csv_path": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/comparison_results/paper1_fire_density_training_3000/runs/light_sparse/training_episode_metrics_2026-06-18_20-24-57.csv",
+  "checkpoint_dir": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/comparison_results/paper1_fire_density_training_3000/runs/light_sparse",
+  "total_episodes": 3000,
+  "episode_offset": 0,
+  "update_frequency": 32,
+  "save_frequency": 500,
+  "log_frequency": 100,
+  "save_success_visualizations": false,
+  "grid_size": 50,
+  "max_episode_steps": 200,
+  "map_identity": {
+    "map_label": "Light/Sparse Fire",
+    "legend_label": "Light/Sparse",
+    "scene_profile": "fire_light",
+    "scene_seed": 20260530,
+    "grid_size": 50,
+    "max_steps": 200,
+    "aerial_cell_px": 8,
+    "source_figure": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/comparison_results/paper1_fire_density_final/figures/paper1_light_sparse_fire_baseline_50x50_environment.png",
+    "map_source": "recreated_exact_paper1_fire_density_episode_1_from_profile_and_seed",
+    "map_package_path": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/comparison_results/paper1_fire_density_training_3000/maps/paper1_exact_light_sparse_map.npz",
+    "created_at": "2026-06-19T00:10:14.663968",
+    "classifier_checkpoint": "/Users/clintonimaro/Documents/Projects/uav-research/checkpoints/checkpoint.pth",
+    "disaster_locations": [
+      {
+        "type": "fire",
+        "position": [
+          27,
+          25
+        ],
+        "intensity": 0.6377593875229006,
+        "grid_coords": [
+          27,
+          25
+        ]
+      },
+      {
+        "type": "fire",
+        "position": [
+          41,
+          24
+        ],
+        "intensity": 0.6902297050780319,
+        "grid_coords": [
+          41,
+          24
+        ]
+      }
+    ],
+    "fire_zone_count": 2,
+    "max_ground_truth_hazard": 0.6902297139167786,
+    "max_classifier_hazard": 0.9924956747302076,
+    "metadata_path": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/comparison_results/paper1_fire_density_training_3000/maps/paper1_exact_light_sparse_map.json"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "baseline_episode_rows": 10,
+  "baseline_summary_rows": 2,
+  "grid_episode_rows": 0,
+  "grid_summary_rows": 0,
+  "nonfinite_values": 0,
+  "baseline_environments": [
+    "Light/Sparse Fire"
+  ],
+  "baseline_methods": [
+    "A*",
+    "PPO"
+  ],
+  "grid_sizes": [],
+  "expected_baseline_episode_rows": 10
+}

@@ -1,0 +1,75 @@
+{
+  "training_completed": "2026-06-18T20:09:17.215506",
+  "total_episodes": 2,
+  "episodes_this_run": 2,
+  "final_success_rate": 0.0,
+  "average_reward": -0.9691803612509418,
+  "navigation_efficiency": 0.020044222318012034,
+  "classifier_model": "efficientnet_b0",
+  "environment_size": "50x50",
+  "disaster_classes": [
+    "collapsed_building",
+    "fire",
+    "flooded_areas",
+    "normal",
+    "traffic_incident"
+  ],
+  "training_csv_path": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/comparison_results/paper1_fire_density_training_smoke/runs/moderate/training_episode_metrics_2026-06-18_20-09-16.csv",
+  "checkpoint_dir": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/comparison_results/paper1_fire_density_training_smoke/runs/moderate",
+  "map_identity": {
+    "map_label": "Moderate Fire",
+    "legend_label": "Moderate",
+    "scene_profile": "fire_moderate",
+    "scene_seed": 20360530,
+    "grid_size": 50,
+    "max_steps": 200,
+    "aerial_cell_px": 8,
+    "source_figure": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/comparison_results/paper1_fire_density_final/figures/paper1_moderate_fire_baseline_50x50_environment.png",
+    "map_source": "recreated_exact_paper1_fire_density_episode_1_from_profile_and_seed",
+    "map_package_path": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/comparison_results/paper1_fire_density_training_smoke/maps/paper1_exact_moderate_map.npz",
+    "created_at": "2026-06-19T00:09:04.009746",
+    "classifier_checkpoint": "/Users/clintonimaro/Documents/Projects/uav-research/checkpoints/checkpoint.pth",
+    "disaster_locations": [
+      {
+        "type": "fire",
+        "position": [
+          23,
+          23
+        ],
+        "intensity": 0.8690587538595622,
+        "grid_coords": [
+          23,
+          23
+        ]
+      },
+      {
+        "type": "fire",
+        "position": [
+          20,
+          16
+        ],
+        "intensity": 0.8072568551447639,
+        "grid_coords": [
+          20,
+          16
+        ]
+      },
+      {
+        "type": "fire",
+        "position": [
+          15,
+          7
+        ],
+        "intensity": 0.7575436767513799,
+        "grid_coords": [
+          15,
+          7
+        ]
+      }
+    ],
+    "fire_zone_count": 3,
+    "max_ground_truth_hazard": 0.8690587282180786,
+    "max_classifier_hazard": 0.9971325845676233,
+    "metadata_path": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/comparison_results/paper1_fire_density_training_smoke/maps/paper1_exact_moderate_map.json"
+  }
+}

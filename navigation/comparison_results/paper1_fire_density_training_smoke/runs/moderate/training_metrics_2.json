@@ -1,0 +1,19 @@
+{
+  "episode_rewards": [
+    -43.78071793282679,
+    41.842357210324906
+  ],
+  "episode_lengths": [
+    150,
+    200
+  ],
+  "success_episodes": [
+    false,
+    false
+  ],
+  "policy_losses": [],
+  "navigation_efficiency": [
+    0.02125247697783496,
+    0.01883596765818911
+  ]
+}

@@ -1,0 +1,1 @@
+run_id,episode,reward,steps,success,navigation_efficiency,path_efficiency,goal_distance,grid_size,max_episode_steps,map_label,scene_profile,scene_seed,map_package_path,timestamp_utc

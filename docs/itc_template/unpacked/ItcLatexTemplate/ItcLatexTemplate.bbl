@@ -1,0 +1,37 @@
+\begin{thebibliography}{1}
+
+\bibitem{CcsdsOrangeBook}
+{Consultive Committee for Space Data Systems (CCSDS)}, ``Low density parity
+  check codes for use in near-{Earth} and deep space applications {(131.1-O-2
+  Orange Book)},'' Sep. 2007.
+
+\bibitem{ChalfantIrving}
+T.~Chalfant and C.~Irving, ``Range telemetry improvement and modernization,''
+  in {\em Proc. Int. Telemetering Conf.}, (Las Vegas, NV), pp.~294--303, Oct.
+  1997.
+
+\bibitem{CoverBook}
+T.~M. Cover and J.~A. Thomas, {\em Elements of Information Theory}.
+\newblock New Jersey: Wiley, 2006.
+
+\bibitem{DapperHill}
+M.~J. Dapper and T.~J. Hill, ``{SBPSK}: {A} robust bandwidth-efficient
+  modulation for hard-limited channels,'' in {\em Proc. {IEEE} Military Commun.
+  Conf.}, Oct. 1984.
+
+\bibitem{ForneyVa}
+G.~D. Forney, ``The {V}iterbi algorithm,'' {\em Proc. {IEEE}}, vol.~61,
+  pp.~268--278, Mar. 1973.
+
+\bibitem{Irig106-04}
+Range Commanders Council Telemetry Group, Range Commanders Council, White Sands
+  Missile Range, New Mexico, {\em IRIG Standard 106-04: Telemetry Standards},
+  2004.
+\newblock (Available on-line at {http://www.ntia.doc.gov/osmhome/106.pdf}).
+
+\bibitem{LiSimon}
+L.~Li and M.~Simon, ``{P}erformance of coded {OQPSK} and {MIL-STD SOQPSK} with
+  iterative decoding,'' {\em {IEEE} Trans. Commun.}, vol.~52, pp.~1890--1900,
+  Nov. 2004.
+
+\end{thebibliography}

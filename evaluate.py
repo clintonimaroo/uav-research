@@ -3,25 +3,133 @@ import torch
 import torch.nn as nn
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.metrics import classification_report, confusion_matrix
 from tqdm import tqdm
 import argparse
 
 from config import TrainingConfig
 from disaster_dataset import create_data_loaders, AIDERDataset, get_transforms
 from models import create_model
-from utils import load_checkpoint, calculate_metrics, create_confusion_matrix
+
+
+def fixed_confusion_matrix(y_true, y_pred, labels):
+    label_to_index = {int(label): idx for idx, label in enumerate(labels)}
+    cm = np.zeros((len(labels), len(labels)), dtype=int)
+    for true_label, pred_label in zip(y_true, y_pred):
+        true_index = label_to_index.get(int(true_label))
+        pred_index = label_to_index.get(int(pred_label))
+        if true_index is not None and pred_index is not None:
+            cm[true_index, pred_index] += 1
+    return cm
+
+
+def accuracy_score_fixed(y_true, y_pred):
+    y_true = np.asarray(y_true)
+    y_pred = np.asarray(y_pred)
+    return float(np.mean(y_true == y_pred)) if len(y_true) else 0.0
+
+
+def precision_recall_fscore_support_fixed(y_true, y_pred, labels, average=None):
+    cm = fixed_confusion_matrix(y_true, y_pred, labels)
+    tp = np.diag(cm).astype(float)
+    predicted = cm.sum(axis=0).astype(float)
+    actual = cm.sum(axis=1).astype(float)
+    precision = np.divide(tp, predicted, out=np.zeros_like(tp), where=predicted != 0)
+    recall = np.divide(tp, actual, out=np.zeros_like(tp), where=actual != 0)
+    f1 = np.divide(2 * precision * recall, precision + recall, out=np.zeros_like(tp), where=(precision + recall) != 0)
+    support = actual.astype(int)
+
+    if average is None:
+        return precision, recall, f1, support
+    if average == 'weighted':
+        total = support.sum()
+        weights = support / total if total else np.zeros_like(support, dtype=float)
+        return (
+            float(np.sum(precision * weights)),
+            float(np.sum(recall * weights)),
+            float(np.sum(f1 * weights)),
+            None,
+        )
+    if average == 'macro':
+        return float(np.mean(precision)), float(np.mean(recall)), float(np.mean(f1)), None
+    raise ValueError(f"Unsupported average: {average}")
+
+
+def rankdata_average(values):
+    values = np.asarray(values)
+    order = np.argsort(values)
+    ranks = np.empty(len(values), dtype=float)
+    i = 0
+    while i < len(values):
+        j = i
+        while j + 1 < len(values) and values[order[j + 1]] == values[order[i]]:
+            j += 1
+        ranks[order[i:j + 1]] = (i + j + 2) / 2.0
+        i = j + 1
+    return ranks
+
+
+def roc_auc_binary(y_true_binary, scores):
+    y_true_binary = np.asarray(y_true_binary, dtype=int)
+    scores = np.asarray(scores, dtype=float)
+    pos = y_true_binary == 1
+    neg = y_true_binary == 0
+    n_pos = int(pos.sum())
+    n_neg = int(neg.sum())
+    if n_pos == 0 or n_neg == 0:
+        raise ValueError("ROC AUC is undefined when one class is missing")
+    ranks = rankdata_average(scores)
+    rank_sum_pos = float(ranks[pos].sum())
+    return (rank_sum_pos - n_pos * (n_pos + 1) / 2.0) / (n_pos * n_neg)
+
+
+def average_precision_binary(y_true_binary, scores):
+    y_true_binary = np.asarray(y_true_binary, dtype=int)
+    scores = np.asarray(scores, dtype=float)
+    n_pos = int((y_true_binary == 1).sum())
+    if n_pos == 0:
+        raise ValueError("Average precision is undefined without positives")
+    order = np.argsort(-scores)
+    sorted_true = y_true_binary[order]
+    tp = np.cumsum(sorted_true == 1)
+    precision_at_k = tp / np.arange(1, len(sorted_true) + 1)
+    return float(precision_at_k[sorted_true == 1].sum() / n_pos)
+
+
+def classification_report_fixed(y_true, y_pred, labels, target_names):
+    precision, recall, f1, support = precision_recall_fscore_support_fixed(y_true, y_pred, labels)
+    accuracy = accuracy_score_fixed(y_true, y_pred)
+    macro = precision_recall_fscore_support_fixed(y_true, y_pred, labels, average='macro')
+    weighted = precision_recall_fscore_support_fixed(y_true, y_pred, labels, average='weighted')
+
+    lines = [
+        f"{'':>20} {'precision':>10} {'recall':>10} {'f1-score':>10} {'support':>10}",
+        "",
+    ]
+    for name, p, r, f, s in zip(target_names, precision, recall, f1, support):
+        lines.append(f"{name:>20} {p:>10.2f} {r:>10.2f} {f:>10.2f} {int(s):>10d}")
+    lines.extend([
+        "",
+        f"{'accuracy':>20} {'':>10} {'':>10} {accuracy:>10.2f} {int(np.sum(support)):>10d}",
+        f"{'macro avg':>20} {macro[0]:>10.2f} {macro[1]:>10.2f} {macro[2]:>10.2f} {int(np.sum(support)):>10d}",
+        f"{'weighted avg':>20} {weighted[0]:>10.2f} {weighted[1]:>10.2f} {weighted[2]:>10.2f} {int(np.sum(support)):>10d}",
+        "",
+    ])
+    return "\n".join(lines)
 
 class ModelEvaluator:
     """Comprehensive model evaluation for disaster detection"""
     
     def __init__(self, model_path: str, config_path: str = None):
         self.model_path = model_path
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        if torch.cuda.is_available():
+            self.device = torch.device('cuda')
+        elif torch.backends.mps.is_available():
+            self.device = torch.device('mps')
+        else:
+            self.device = torch.device('cpu')
         
         # Load checkpoint
-        self.checkpoint = torch.load(model_path, map_location=self.device)
+        self.checkpoint = torch.load(model_path, map_location=self.device, weights_only=False)
         
         if config_path:
             self.config = TrainingConfig.load_config(config_path)
@@ -83,15 +191,14 @@ class ModelEvaluator:
     
     def calculate_detailed_metrics(self, y_true, y_pred, y_probs):
         """Calculate detailed classification metrics"""
-        from sklearn.metrics import (
-            accuracy_score, precision_recall_fscore_support,
-            roc_auc_score, average_precision_score
-        )
-        
-        accuracy = accuracy_score(y_true, y_pred)
-        precision, recall, f1, support = precision_recall_fscore_support(y_true, y_pred, average=None)
-        
         class_names = [self.idx_to_class[i] for i in range(len(self.idx_to_class))]
+        labels = list(range(len(class_names)))
+        accuracy = accuracy_score_fixed(y_true, y_pred)
+        precision, recall, f1, support = precision_recall_fscore_support_fixed(
+            y_true,
+            y_pred,
+            labels=labels,
+        )
         metrics = {}
         
         for i, class_name in enumerate(class_names):
@@ -105,21 +212,26 @@ class ModelEvaluator:
             if len(class_names) == 2:
                 if i == 1:  # Positive class
                     try:
-                        metrics[class_name]['roc_auc'] = roc_auc_score(y_true, y_probs[:, i])
-                        metrics[class_name]['avg_precision'] = average_precision_score(y_true, y_probs[:, i])
-                    except:
+                        metrics[class_name]['roc_auc'] = roc_auc_binary(y_true, y_probs[:, i])
+                        metrics[class_name]['avg_precision'] = average_precision_binary(y_true, y_probs[:, i])
+                    except ValueError:
                         metrics[class_name]['roc_auc'] = 0.0
                         metrics[class_name]['avg_precision'] = 0.0
             else:
                 try:
                     y_true_binary = (y_true == i).astype(int)
-                    metrics[class_name]['roc_auc'] = roc_auc_score(y_true_binary, y_probs[:, i])
-                    metrics[class_name]['avg_precision'] = average_precision_score(y_true_binary, y_probs[:, i])
-                except:
+                    metrics[class_name]['roc_auc'] = roc_auc_binary(y_true_binary, y_probs[:, i])
+                    metrics[class_name]['avg_precision'] = average_precision_binary(y_true_binary, y_probs[:, i])
+                except ValueError:
                     metrics[class_name]['roc_auc'] = 0.0
                     metrics[class_name]['avg_precision'] = 0.0
         
-        precision_avg, recall_avg, f1_avg, _ = precision_recall_fscore_support(y_true, y_pred, average='weighted')
+        precision_avg, recall_avg, f1_avg, _ = precision_recall_fscore_support_fixed(
+            y_true,
+            y_pred,
+            labels=labels,
+            average='weighted',
+        )
         
         metrics['overall'] = {
             'accuracy': accuracy,
@@ -132,11 +244,21 @@ class ModelEvaluator:
     
     def plot_confusion_matrix(self, y_true, y_pred, class_names, save_path=None):
         """Plot confusion matrix"""
-        cm = confusion_matrix(y_true, y_pred)
+        labels = list(range(len(class_names)))
+        cm = fixed_confusion_matrix(y_true, y_pred, labels=labels)
         
-        plt.figure(figsize=(10, 8))
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
-                   xticklabels=class_names, yticklabels=class_names)
+        fig, ax = plt.subplots(figsize=(10, 8))
+        image = ax.imshow(cm, interpolation='nearest', cmap='Blues')
+        fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
+        ax.set_xticks(np.arange(len(class_names)))
+        ax.set_yticks(np.arange(len(class_names)))
+        ax.set_xticklabels(class_names, rotation=45, ha='right')
+        ax.set_yticklabels(class_names)
+        threshold = cm.max() / 2.0 if cm.size and cm.max() > 0 else 0.0
+        for i in range(cm.shape[0]):
+            for j in range(cm.shape[1]):
+                color = 'white' if cm[i, j] > threshold else 'black'
+                ax.text(j, i, format(cm[i, j], 'd'), ha='center', va='center', color=color)
         plt.title('Confusion Matrix')
         plt.xlabel('Predicted')
         plt.ylabel('Actual')
@@ -199,6 +321,7 @@ class ModelEvaluator:
             os.makedirs(save_dir, exist_ok=True)
         
         _, val_transform = get_transforms(self.config.input_size, augment=False)
+        np.random.seed(42)
         test_dataset = AIDERDataset(
             dataset_path=self.config.dataset_path,
             classes=self.config.classes,
@@ -248,17 +371,36 @@ class ModelEvaluator:
             fig_dist = self.plot_class_distribution(y_true, class_names,
                                                    os.path.join(save_dir, 'class_distribution.png'))
             plt.close(fig_dist)
+            np.savetxt(
+                os.path.join(save_dir, 'confusion_matrix.csv'),
+                cm,
+                delimiter=',',
+                fmt='%d',
+                header=','.join(class_names),
+                comments='',
+            )
             
             import json
+            with open(os.path.join(save_dir, 'class_names.json'), 'w') as f:
+                json.dump(class_names, f, indent=2)
+            with open(os.path.join(save_dir, 'classification_report.txt'), 'w') as f:
+                f.write(classification_report_fixed(
+                    y_true,
+                    y_pred,
+                    labels=list(range(len(class_names))),
+                    target_names=class_names,
+                ))
             metrics_file = os.path.join(save_dir, 'metrics.json')
             with open(metrics_file, 'w') as f:
                 json_metrics = {}
                 for k, v in metrics.items():
                     if isinstance(v, dict):
-                        json_metrics[k] = {k2: float(v2) if isinstance(v2, (np.float32, np.float64)) else int(v2) 
-                                         for k2, v2 in v.items()}
+                        json_metrics[k] = {
+                            k2: float(v2) if isinstance(v2, (np.floating, float)) else int(v2)
+                            for k2, v2 in v.items()
+                        }
                     else:
-                        json_metrics[k] = float(v) if isinstance(v, (np.float32, np.float64)) else v
+                        json_metrics[k] = float(v) if isinstance(v, (np.floating, float)) else v
                 json.dump(json_metrics, f, indent=2)
             
             print(f"\nResults saved to: {save_dir}")

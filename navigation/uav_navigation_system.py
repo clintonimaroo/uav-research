@@ -7,14 +7,30 @@ import csv
 import os
 import time
 from datetime import datetime
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 
 from uav_environment import UAVNavigationEnv
 from ppo_navigation import PPONavigationAgent
 
 class UAVNavigationSystem:
-    def __init__(self, grid_size: int = 50, max_episode_steps: int = 200, cache_imagery: bool = True):
-        self.env = UAVNavigationEnv(grid_size=grid_size, max_steps=max_episode_steps, cache_imagery=cache_imagery)
+    def __init__(
+        self,
+        grid_size: int = 50,
+        max_episode_steps: int = 200,
+        cache_imagery: bool = True,
+        classifier_path: str = "../checkpoints/best_model.pth",
+        fixed_map_path: Optional[str] = None,
+        checkpoint_dir: str = "navigation_models",
+        quiet_scene: bool = False,
+    ):
+        self.env = UAVNavigationEnv(
+            grid_size=grid_size,
+            max_steps=max_episode_steps,
+            classifier_path=classifier_path,
+            cache_imagery=cache_imagery,
+            fixed_map_path=fixed_map_path,
+            quiet_scene=quiet_scene,
+        )
         self.agent = PPONavigationAgent(
             input_shape=self.env.observation_space.shape,
             action_dim=self.env.action_space.n,
@@ -31,8 +47,9 @@ class UAVNavigationSystem:
             'navigation_efficiency': []
         }
         
-        self.checkpoint_dir = "navigation_models"
+        self.checkpoint_dir = checkpoint_dir
         os.makedirs(self.checkpoint_dir, exist_ok=True)
+        self.map_identity = self.env.map_identity()
         self.training_run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.training_csv_path = os.path.join(
             self.checkpoint_dir, f"training_episode_metrics_{self.training_run_id}.csv"
@@ -44,9 +61,14 @@ class UAVNavigationSystem:
             "steps",
             "success",
             "navigation_efficiency",
+            "path_efficiency",
             "goal_distance",
             "grid_size",
             "max_episode_steps",
+            "map_label",
+            "scene_profile",
+            "scene_seed",
+            "map_package_path",
             "timestamp_utc",
         ]
         self._initialize_training_csv()
@@ -73,9 +95,14 @@ class UAVNavigationSystem:
             "steps": int(steps),
             "success": int(success),
             "navigation_efficiency": float(navigation_efficiency),
+            "path_efficiency": float(navigation_efficiency),
             "goal_distance": float(goal_distance),
             "grid_size": int(self.env.grid_size),
             "max_episode_steps": int(self.env.max_steps),
+            "map_label": self.map_identity.get("map_label", ""),
+            "scene_profile": self.map_identity.get("scene_profile", ""),
+            "scene_seed": self.map_identity.get("scene_seed", ""),
+            "map_package_path": self.map_identity.get("map_package_path", ""),
             "timestamp_utc": datetime.utcnow().isoformat(),
         }
         with open(self.training_csv_path, "a", newline="") as csv_file:
@@ -87,7 +114,8 @@ class UAVNavigationSystem:
                                save_frequency: int = 200,
                                log_frequency: int = 100,
                                episode_offset: int = 0,
-                               resume_checkpoint: str = None):
+                               resume_checkpoint: str = None,
+                               save_success_visualizations: bool = True):
         
         self._episode_plot_offset = episode_offset
         if resume_checkpoint and os.path.isfile(resume_checkpoint):
@@ -101,8 +129,21 @@ class UAVNavigationSystem:
         print(f"Training UAV Navigation System")
         print(f"Environment: {self.env.grid_size}x{self.env.grid_size} grid")
         print(f"Classifier: {self.env.config.model_name}")
+        print(f"Training map: {self.map_identity.get('map_label', self.map_identity.get('scene_profile', 'unknown'))}")
+        print(f"Map profile: {self.map_identity.get('scene_profile', 'unknown')}")
+        print(f"Map seed: {self.map_identity.get('scene_seed', 'unknown')}")
+        print(f"Map file: {self.map_identity.get('map_package_path', '')}")
         print(f"Episodes this run: {total_episodes} (global episode {episode_offset + 1} .. {target_global})")
         print("-" * 60)
+        self._write_training_run_metadata(
+            total_episodes=total_episodes,
+            update_frequency=update_frequency,
+            save_frequency=save_frequency,
+            log_frequency=log_frequency,
+            episode_offset=episode_offset,
+            save_success_visualizations=save_success_visualizations,
+            status="started",
+        )
         
         episode_count = 0
         best_success_rate = 0.0
@@ -173,7 +214,7 @@ class UAVNavigationSystem:
                 self.save_checkpoint(global_episode)
                 self.plot_training_metrics()
                 
-                if success:
+                if success and save_success_visualizations:
                     self.demonstrate_navigation(global_episode, save_visualization=True)
             
             episode_count += 1
@@ -184,6 +225,45 @@ class UAVNavigationSystem:
             cumulative_episodes=episode_offset + len(self.training_metrics['episode_rewards']),
             episodes_this_run=len(self.training_metrics['episode_rewards']),
         )
+        self._write_training_run_metadata(
+            total_episodes=total_episodes,
+            update_frequency=update_frequency,
+            save_frequency=save_frequency,
+            log_frequency=log_frequency,
+            episode_offset=episode_offset,
+            save_success_visualizations=save_success_visualizations,
+            status="completed",
+        )
+
+    def _write_training_run_metadata(
+        self,
+        total_episodes: int,
+        update_frequency: int,
+        save_frequency: int,
+        log_frequency: int,
+        episode_offset: int,
+        save_success_visualizations: bool,
+        status: str,
+    ):
+        metadata = {
+            "status": status,
+            "updated_at": datetime.utcnow().isoformat(),
+            "training_run_id": self.training_run_id,
+            "training_csv_path": os.path.abspath(self.training_csv_path),
+            "checkpoint_dir": os.path.abspath(self.checkpoint_dir),
+            "total_episodes": int(total_episodes),
+            "episode_offset": int(episode_offset),
+            "update_frequency": int(update_frequency),
+            "save_frequency": int(save_frequency),
+            "log_frequency": int(log_frequency),
+            "save_success_visualizations": bool(save_success_visualizations),
+            "grid_size": int(self.env.grid_size),
+            "max_episode_steps": int(self.env.max_steps),
+            "map_identity": self.map_identity,
+        }
+        path = os.path.join(self.checkpoint_dir, "training_run_metadata.json")
+        with open(path, "w") as handle:
+            json.dump(metadata, handle, indent=2)
     
     def demonstrate_navigation(self, episode_id: int = None, save_visualization: bool = False,
                               real_time: bool = True):
@@ -374,7 +454,7 @@ class UAVNavigationSystem:
         axes[1, 1].grid(True)
         
         plt.tight_layout()
-        plt.savefig('navigation_training_progress.png', dpi=300, bbox_inches='tight')
+        plt.savefig(os.path.join(self.checkpoint_dir, 'navigation_training_progress.png'), dpi=300, bbox_inches='tight')
         plt.close()
     
     def generate_final_report(self, cumulative_episodes: int = None, episodes_this_run: int = None):
@@ -392,10 +472,14 @@ class UAVNavigationSystem:
             'navigation_efficiency': float(avg_efficiency),
             'classifier_model': self.env.config.model_name,
             'environment_size': f"{self.env.grid_size}x{self.env.grid_size}",
-            'disaster_classes': list(self.env.class_to_idx.keys())
+            'disaster_classes': list(self.env.class_to_idx.keys()),
+            'training_csv_path': os.path.abspath(self.training_csv_path),
+            'checkpoint_dir': os.path.abspath(self.checkpoint_dir),
+            'map_identity': self.map_identity,
         }
         
-        with open('navigation_training_report.json', 'w') as f:
+        report_path = os.path.join(self.checkpoint_dir, 'navigation_training_report.json')
+        with open(report_path, 'w') as f:
             json.dump(report, f, indent=2)
         
         print(f"\nFinal Training Report:")
@@ -411,11 +495,16 @@ def main():
     parser.add_argument("--episode-offset", type=int, default=0, help="Global episode index before this run (for resume)")
     parser.add_argument("--resume", type=str, default="", help="Path to .pth to load (e.g. navigation_models/best_navigation_model.pth)")
     parser.add_argument("--no-cache", action="store_true", help="New scene each episode (generalization training)")
+    parser.add_argument("--classifier", type=str, default="../checkpoints/best_model.pth")
+    parser.add_argument("--fixed-map", type=str, default="", help="Path to a saved Paper 1 fixed map .npz package")
+    parser.add_argument("--checkpoint-dir", type=str, default="navigation_models")
+    parser.add_argument("--quiet-scene", action="store_true")
     parser.add_argument("--grid", type=int, default=50)
     parser.add_argument("--max-steps", type=int, default=200)
     parser.add_argument("--update-freq", type=int, default=32)
     parser.add_argument("--save-freq", type=int, default=200)
     parser.add_argument("--log-freq", type=int, default=100)
+    parser.add_argument("--no-success-visualizations", action="store_true")
     parser.add_argument("--demo", action="store_true", help="After training, run real-time demo")
     args = parser.parse_args()
 
@@ -423,6 +512,10 @@ def main():
         grid_size=args.grid,
         max_episode_steps=args.max_steps,
         cache_imagery=not args.no_cache,
+        classifier_path=args.classifier,
+        fixed_map_path=args.fixed_map.strip() or None,
+        checkpoint_dir=args.checkpoint_dir,
+        quiet_scene=args.quiet_scene,
     )
     
     print("Initializing UAV Navigation System with Disaster Detection")
@@ -436,6 +529,7 @@ def main():
         log_frequency=args.log_freq,
         episode_offset=args.episode_offset,
         resume_checkpoint=resume_path,
+        save_success_visualizations=not args.no_success_visualizations,
     )
     
     if args.demo:

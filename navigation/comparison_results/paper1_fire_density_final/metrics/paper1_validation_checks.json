@@ -1,0 +1,18 @@
+{
+  "baseline_episode_rows": 3000,
+  "baseline_summary_rows": 6,
+  "grid_episode_rows": 0,
+  "grid_summary_rows": 0,
+  "nonfinite_values": 0,
+  "baseline_environments": [
+    "Dense/Heavy Fire",
+    "Light/Sparse Fire",
+    "Moderate Fire"
+  ],
+  "baseline_methods": [
+    "A*",
+    "PPO"
+  ],
+  "grid_sizes": [],
+  "expected_baseline_summary_rows": 6
+}

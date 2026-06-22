@@ -1,0 +1,91 @@
+{
+  "map_label": "Dense/Heavy Fire",
+  "legend_label": "Dense/Heavy",
+  "scene_profile": "fire_dense",
+  "scene_seed": 20460530,
+  "grid_size": 50,
+  "max_steps": 200,
+  "aerial_cell_px": 8,
+  "source_figure": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/comparison_results/paper1_fire_density_final/figures/paper1_dense_heavy_fire_baseline_50x50_environment.png",
+  "map_source": "recreated_exact_paper1_fire_density_episode_1_from_profile_and_seed",
+  "map_package_path": "/Users/clintonimaro/Documents/Projects/uav-research/navigation/comparison_results/paper1_fire_density_training_mps_smoke/maps/paper1_exact_dense_heavy_map.npz",
+  "created_at": "2026-06-19T00:15:07.878734",
+  "classifier_checkpoint": "/Users/clintonimaro/Documents/Projects/uav-research/checkpoints/checkpoint.pth",
+  "disaster_locations": [
+    {
+      "type": "fire",
+      "position": [
+        2,
+        19
+      ],
+      "intensity": 0.8933381816281967,
+      "grid_coords": [
+        2,
+        19
+      ]
+    },
+    {
+      "type": "fire",
+      "position": [
+        44,
+        24
+      ],
+      "intensity": 0.971893448466483,
+      "grid_coords": [
+        44,
+        24
+      ]
+    },
+    {
+      "type": "fire",
+      "position": [
+        24,
+        36
+      ],
+      "intensity": 0.9042963830990525,
+      "grid_coords": [
+        24,
+        36
+      ]
+    },
+    {
+      "type": "fire",
+      "position": [
+        10,
+        36
+      ],
+      "intensity": 0.7597587389670104,
+      "grid_coords": [
+        10,
+        36
+      ]
+    },
+    {
+      "type": "fire",
+      "position": [
+        2,
+        34
+      ],
+      "intensity": 0.7962225121373419,
+      "grid_coords": [
+        2,
+        34
+      ]
+    },
+    {
+      "type": "fire",
+      "position": [
+        30,
+        26
+      ],
+      "intensity": 0.8244028872272463,
+      "grid_coords": [
+        30,
+        26
+      ]
+    }
+  ],
+  "fire_zone_count": 6,
+  "max_ground_truth_hazard": 0.9718934297561646,
+  "max_classifier_hazard": 0.9981969437405382
+}
